@@ -1,0 +1,167 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: customer-service
+
+  # DeepSeek via Spring AI OpenAI-compatible mode
+  ai:
+    openai:
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      api-key: ${DEEPSEEK_API_KEY:}
+      chat:
+        enabled: true
+        options:
+          model: deepseek-chat
+          temperature: 0.7
+          max-tokens: 2048
+
+  # Redis (Reactive)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+
+  # MySQL (JPA) — 生产默认连接 docker-compose 中的 MySQL
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3307/cs_customer?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+    driver-class-name: ${MYSQL_DRIVER:com.mysql.cj.jdbc.Driver}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 4
+      connection-timeout: 5000
+      idle-timeout: 300000
+      max-lifetime: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: ${JPA_DIALECT:org.hibernate.dialect.MySQLDialect}
+        format_sql: true
+
+  # Kafka
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: cs-consumer-group
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+    listener:
+      ack-mode: manual
+
+  # Flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+
+# Management / Actuator / Prometheus
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        "[chat_llm_latency_seconds]": true
+        "[chat_first_token_seconds]": true
+    tags:
+      application: customer-service
+
+# Resilience4j
+resilience4j:
+  ratelimiter:
+    instances:
+      chat:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 5s
+  timelimiter:
+    instances:
+      chat:
+        timeout-duration: 35s
+        cancel-running-future: true
+  circuitbreaker:
+    instances:
+      chat:
+        sliding-window-size: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+        minimum-number-of-calls: 10
+  bulkhead:
+    instances:
+      chat:
+        max-concurrent-calls: 25
+        max-wait-duration: 2s
+
+# Custom multi-tenant model routing config
+cs:
+  security:
+    tenant-keys:
+      default: ${TENANT_DEFAULT_KEY:change-me}
+      tenant-a: ${TENANT_A_KEY:change-me}
+      tenant-b: ${TENANT_B_KEY:change-me}
+  routing:
+    tenants:
+      default:
+        model-name: deepseek-chat
+        temperature: 0.7
+        max-tokens: 2048
+        function-call-enabled: true
+      tenant-a:
+        model-name: deepseek-chat
+        temperature: 0.5
+        max-tokens: 1024
+        function-call-enabled: true
+      tenant-b:
+        model-name: deepseek-chat
+        temperature: 0.8
+        max-tokens: 4096
+        function-call-enabled: true
+    gray:
+      enabled: false
+      target-model: deepseek-chat
+      percentage: 0
+
+logging:
+  pattern:
+    level: "%5p [%X{traceId:-}--%X{spanId:-}]"
+  level:
+    com.cs.customerservice: DEBUG
+    org.springframework.ai: INFO

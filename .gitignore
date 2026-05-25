@@ -1,0 +1,31 @@
+# Logs
+*.log
+
+# Backend build
+backend/target/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Environment files
+.env
+!.env.example
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Skills lock
+skills-lock.json
+
+# Docker volumes
+mysql-data/
