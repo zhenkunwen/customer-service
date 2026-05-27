@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1/cs';
-const TIMEOUT = Number(import.meta.env.VITE_REQUEST_TIMEOUT) || 30000;
+const TIMEOUT = Number(import.meta.env.VITE_REQUEST_TIMEOUT) || 60000;
 
 const client = axios.create({
   baseURL: BASE_URL,
@@ -9,13 +9,19 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const defaultApiKeys: Record<string, string> = {
+  default: 'change-me',
+  'tenant-a': 'change-me',
+  'tenant-b': 'change-me',
+};
+
 // 请求拦截器：自动注入 API Key
 client.interceptors.request.use((config) => {
   try {
-    // 从 localStorage 读取当前租户的 API Key
+    // 从 localStorage 读取当前租户的 API Key，无则使用默认值
     const tenantId = localStorage.getItem('cs-tenant-id') || 'default';
-    const key = localStorage.getItem(`cs-apikey-${tenantId}`)
-      || '';
+    const saved = localStorage.getItem(`cs-apikey-${tenantId}`);
+    const key = saved || defaultApiKeys[tenantId] || '';
     config.headers['X-API-Key'] = key;
   } catch { /* ignore */ }
   return config;

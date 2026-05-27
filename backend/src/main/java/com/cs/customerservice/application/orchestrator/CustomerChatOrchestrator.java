@@ -6,6 +6,7 @@ import com.cs.customerservice.application.service.ConversationMemoryService;
 import com.cs.customerservice.application.service.KnowledgeRetrievalPort;
 import com.cs.customerservice.application.service.MultiLevelCacheService;
 import com.cs.customerservice.application.service.UserProfileService;
+import com.cs.customerservice.application.ai.Difficulty;
 import com.cs.customerservice.application.ai.DifficultyClassifier;
 import com.cs.customerservice.application.tool.LogisticsTool;
 import com.cs.customerservice.application.tool.OrderTool;
@@ -135,6 +136,10 @@ public class CustomerChatOrchestrator {
                     String emotionLevel = inferEmotionLevel(sanitized);
                     String topic = inferTopic(sanitized);
                     return difficultyClassifier.classify(request.getTenantId(), sanitized, emotionLevel, topic)
+                            .onErrorResume(e -> {
+                                log.warn("Difficulty classification failed, defaulting to SIMPLE", e);
+                                return Mono.just(Difficulty.SIMPLE);
+                            })
                             .flatMap(difficulty -> {
                                 ChatClient client = modelRouter.resolveByDifficulty(
                                         request.getTenantId(), request.getUserId(), difficulty);
@@ -209,6 +214,10 @@ public class CustomerChatOrchestrator {
                     String emotionLevel = inferEmotionLevel(sanitized);
                     String topic = inferTopic(sanitized);
                     return difficultyClassifier.classify(request.getTenantId(), sanitized, emotionLevel, topic)
+                            .onErrorResume(e -> {
+                                log.warn("Difficulty classification failed in stream, defaulting to SIMPLE", e);
+                                return Mono.just(Difficulty.SIMPLE);
+                            })
                             .flatMapMany(difficulty -> {
                                 ChatClient client = modelRouter.resolveByDifficulty(
                                         request.getTenantId(), request.getUserId(), difficulty);

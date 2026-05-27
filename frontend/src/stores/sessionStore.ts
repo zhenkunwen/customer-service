@@ -18,9 +18,9 @@ function persistSessionId(id: string) {
 }
 
 const defaultApiKeys: Record<string, string> = {
-  default: '',
-  'tenant-a': '',
-  'tenant-b': '',
+  default: 'change-me',
+  'tenant-a': 'change-me',
+  'tenant-b': 'change-me',
 };
 
 function loadApiKey(tenantId: string): string {

@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -24,7 +25,7 @@ public class DifficultyClassifier {
     // 困难问题关键词 — 命中任意一个 = COMPLEX
     private static final List<String> COMPLEX_KEYWORDS = List.of(
             "退货", "退款", "换货", "投诉", "赔偿", "纠纷",
-            "举报", "差评", "气死", "垃圾", "投诉"
+            "举报", "差评", "气死", "垃圾"
     );
 
     private static final int SHORT_QUESTION_THRESHOLD = 15;
@@ -99,7 +100,6 @@ public class DifficultyClassifier {
                             仅返回一个 0-1 之间的小数，不要任何其他文字。
                             0.0 = 非常简单（问候、查单号）
                             1.0 = 非常复杂（纠纷、投诉、多步推理）
-                            阈值: 0.6 以上视为复杂。
                             """)
                     .user(question)
                     .call()
@@ -118,7 +118,7 @@ public class DifficultyClassifier {
                 log.warn("LLM classification parse failed: '{}', default to SIMPLE", response);
                 return Difficulty.SIMPLE;
             }
-        });
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
     }
 
     private static String truncate(String s) {

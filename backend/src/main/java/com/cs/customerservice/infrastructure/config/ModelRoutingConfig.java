@@ -29,21 +29,22 @@ public class ModelRoutingConfig {
     }
 
     public double resolveDifficultyThreshold(String tenantId) {
-        if (tenants != null && tenants.containsKey(tenantId)) {
-            return tenants.get(tenantId).getDifficultyThreshold();
-        }
-        return 0.6;
+        TenantModelConfig config = tenants != null ? tenants.get(tenantId) : null;
+        return config != null ? config.getDifficultyThreshold() : DEFAULT_DIFFICULTY_THRESHOLD;
     }
 
     public String resolveStrongModelName(String tenantId) {
-        if (tenants != null && tenants.containsKey(tenantId)) {
-            String strong = tenants.get(tenantId).getStrongModelName();
+        TenantModelConfig config = tenants != null ? tenants.get(tenantId) : null;
+        if (config != null) {
+            String strong = config.getStrongModelName();
             if (strong != null && !strong.isBlank()) {
                 return strong;
             }
         }
         return null;
     }
+
+    private static final double DEFAULT_DIFFICULTY_THRESHOLD = 0.6;
 
     @Data
     public static class GrayRelease {

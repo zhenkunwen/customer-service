@@ -57,6 +57,13 @@ public class ModelRouter {
     }
 
     private ChatClient buildClient(TenantModelConfig tenantCfg, String modelName) {
+        double temp = tenantCfg != null ? tenantCfg.getTemperature() : 0.7;
+        int tokens = tenantCfg != null ? tenantCfg.getMaxTokens() : 2048;
+        return buildClient(tenantCfg, modelName, temp, tokens);
+    }
+
+    private ChatClient buildClient(TenantModelConfig tenantCfg, String modelName,
+                                   double temperature, int maxTokens) {
         ChatModel chatModel;
         if (tenantCfg != null && tenantCfg.getBaseUrl() != null) {
             OpenAiApi api = OpenAiApi.builder()
@@ -67,16 +74,13 @@ public class ModelRouter {
                     .openAiApi(api)
                     .defaultOptions(OpenAiChatOptions.builder()
                             .model(modelName)
-                            .temperature(tenantCfg.getTemperature())
-                            .maxTokens(tenantCfg.getMaxTokens())
+                            .temperature(temperature)
+                            .maxTokens(maxTokens)
                             .build())
                     .build();
         } else {
             chatModel = defaultChatModel;
         }
-
-        double temperature = tenantCfg != null ? tenantCfg.getTemperature() : 0.7;
-        int maxTokens = tenantCfg != null ? tenantCfg.getMaxTokens() : 2048;
 
         return ChatClient.builder(chatModel)
                 .defaultOptions(OpenAiChatOptions.builder()
@@ -111,12 +115,18 @@ public class ModelRouter {
                 : null;
 
         String modelName;
+        double effectiveTemp;
+        int effectiveTokens;
         if (tenantCfg != null && difficulty == Difficulty.COMPLEX
                 && tenantCfg.getStrongModelName() != null
                 && !tenantCfg.getStrongModelName().isBlank()) {
             modelName = tenantCfg.getStrongModelName();
+            effectiveTemp = tenantCfg.getStrongTemperature();
+            effectiveTokens = tenantCfg.getStrongMaxTokens();
         } else {
             modelName = tenantCfg != null ? tenantCfg.getModelName() : "deepseek-chat";
+            effectiveTemp = tenantCfg != null ? tenantCfg.getTemperature() : 0.7;
+            effectiveTokens = tenantCfg != null ? tenantCfg.getMaxTokens() : 2048;
         }
 
         if (routingConfig.getGray() != null && routingConfig.getGray().isEnabled()) {
@@ -124,8 +134,11 @@ public class ModelRouter {
         }
 
         final String finalModelName = modelName;
+        final double temperature = effectiveTemp;
+        final int maxTokens = effectiveTokens;
         String cacheKey = tenantId + ":" + finalModelName;
-        return clientCache.computeIfAbsent(cacheKey, k -> buildClient(tenantCfg, finalModelName));
+        return clientCache.computeIfAbsent(cacheKey,
+                k -> buildClient(tenantCfg, finalModelName, temperature, maxTokens));
     }
 
     public String resolveModelNameByDifficulty(String tenantId, String userId, Difficulty difficulty) {

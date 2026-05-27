@@ -6,6 +6,8 @@ spring:
     username: sa
     password:
   jpa:
+    hibernate:
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
@@ -15,3 +17,20 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema-h2.sql
+
+  # 本地开发：设置环境变量 DEEPSEEK_API_KEY，无则用 noop 占位（请求快速失败）
+  ai:
+    openai:
+      api-key: ${DEEPSEEK_API_KEY:noop}
+    retry:
+      max-attempts: 1
+
+  # 本地无 Kafka 时快速启动
+  kafka:
+    listener:
+      auto-startup: false
+
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
