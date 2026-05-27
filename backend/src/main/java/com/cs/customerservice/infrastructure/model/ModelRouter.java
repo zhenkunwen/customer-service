@@ -1,5 +1,6 @@
 package com.cs.customerservice.infrastructure.model;
 
+import com.cs.customerservice.application.ai.Difficulty;
 import com.cs.customerservice.infrastructure.config.ModelRoutingConfig;
 import com.cs.customerservice.infrastructure.config.ModelRoutingConfig.TenantModelConfig;
 import org.slf4j.Logger;
@@ -102,5 +103,44 @@ public class ModelRouter {
             model = resolveGrayModel(userId, model);
         }
         return model;
+    }
+
+    public ChatClient resolveByDifficulty(String tenantId, String userId, Difficulty difficulty) {
+        TenantModelConfig tenantCfg = routingConfig.getTenants() != null
+                ? routingConfig.getTenants().get(tenantId)
+                : null;
+
+        String modelName;
+        if (tenantCfg != null && difficulty == Difficulty.COMPLEX
+                && tenantCfg.getStrongModelName() != null
+                && !tenantCfg.getStrongModelName().isBlank()) {
+            modelName = tenantCfg.getStrongModelName();
+        } else {
+            modelName = tenantCfg != null ? tenantCfg.getModelName() : "deepseek-chat";
+        }
+
+        if (routingConfig.getGray() != null && routingConfig.getGray().isEnabled()) {
+            modelName = resolveGrayModel(userId, modelName);
+        }
+
+        final String finalModelName = modelName;
+        String cacheKey = tenantId + ":" + finalModelName;
+        return clientCache.computeIfAbsent(cacheKey, k -> buildClient(tenantCfg, finalModelName));
+    }
+
+    public String resolveModelNameByDifficulty(String tenantId, String userId, Difficulty difficulty) {
+        TenantModelConfig cfg = routingConfig.getTenants() != null
+                ? routingConfig.getTenants().get(tenantId)
+                : null;
+        if (cfg != null && difficulty == Difficulty.COMPLEX
+                && cfg.getStrongModelName() != null
+                && !cfg.getStrongModelName().isBlank()) {
+            String model = cfg.getStrongModelName();
+            if (routingConfig.getGray() != null && routingConfig.getGray().isEnabled()) {
+                model = resolveGrayModel(userId, model);
+            }
+            return model;
+        }
+        return resolveModelName(tenantId, userId);
     }
 }
