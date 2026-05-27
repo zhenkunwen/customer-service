@@ -6,6 +6,7 @@ import com.cs.customerservice.application.service.ConversationMemoryService;
 import com.cs.customerservice.application.service.KnowledgeRetrievalPort;
 import com.cs.customerservice.application.service.MultiLevelCacheService;
 import com.cs.customerservice.application.service.UserProfileService;
+import com.cs.customerservice.application.ai.DifficultyClassifier;
 import com.cs.customerservice.application.tool.LogisticsTool;
 import com.cs.customerservice.application.tool.OrderTool;
 import com.cs.customerservice.application.tool.RefundTool;
@@ -55,6 +56,7 @@ public class CustomerChatOrchestrator {
     private final OrderTool orderTool;
     private final LogisticsTool logisticsTool;
     private final RefundTool refundTool;
+    private final DifficultyClassifier difficultyClassifier;
     private final ObjectMapper objectMapper;
     private final UserProfileService userProfileService;
 
@@ -69,6 +71,7 @@ public class CustomerChatOrchestrator {
                                     OrderTool orderTool,
                                     LogisticsTool logisticsTool,
                                     RefundTool refundTool,
+                                    DifficultyClassifier difficultyClassifier,
                                     ObjectMapper objectMapper,
                                     UserProfileService userProfileService) {
         this.promptGuardService = promptGuardService;
@@ -82,6 +85,7 @@ public class CustomerChatOrchestrator {
         this.orderTool = orderTool;
         this.logisticsTool = logisticsTool;
         this.refundTool = refundTool;
+        this.difficultyClassifier = difficultyClassifier;
         this.objectMapper = objectMapper;
         this.userProfileService = userProfileService;
     }
@@ -101,7 +105,8 @@ public class CustomerChatOrchestrator {
                         metrics.recordRequest(request.getTenantId(),
                                 modelRouter.resolveModelName(request.getTenantId(), request.getUserId()), "cache_hit");
                         return Mono.just(buildDto(request.getSessionId(), cached.get(), null,
-                                System.currentTimeMillis() - startTime, false));
+                                System.currentTimeMillis() - startTime, false,
+                                modelRouter.resolveModelName(request.getTenantId(), request.getUserId())));
                     }
                     return doChat(request, sanitized, startTime, toolMode);
                 });
@@ -125,30 +130,39 @@ public class CustomerChatOrchestrator {
                     List<KnowledgeChunk> chunks = tuple.getT3();
                     String profileSummary = tuple.getT4();
                     String systemPrompt = buildSystemPrompt(request.getTenantId(), summary, chunks, profileSummary);
-                    ChatClient client = modelRouter.resolve(request.getTenantId(), request.getUserId());
 
-                    if (toolMode && modelRouter.isFunctionCallEnabled(request.getTenantId())) {
-                        return executeWithTools(request, sanitized, systemPrompt, history, client, startTime);
-                    }
+                    // 难度分类 + 按难度路由模型
+                    String emotionLevel = inferEmotionLevel(sanitized);
+                    String topic = inferTopic(sanitized);
+                    return difficultyClassifier.classify(request.getTenantId(), sanitized, emotionLevel, topic)
+                            .flatMap(difficulty -> {
+                                ChatClient client = modelRouter.resolveByDifficulty(
+                                        request.getTenantId(), request.getUserId(), difficulty);
+                                String actualModel = modelRouter.resolveModelNameByDifficulty(
+                                        request.getTenantId(), request.getUserId(), difficulty);
 
-                    long llmStart = System.currentTimeMillis();
-                    return Mono.fromCallable(() ->
-                                    client.prompt()
-                                            .system(systemPrompt)
-                                            .messages(buildHistoryMessages(history))
-                                            .user(sanitized)
-                                            .call()
-                                            .content())
-                            .timeout(Duration.ofSeconds(30))
-                            .map(answer -> {
-                                long llmLatency = System.currentTimeMillis() - llmStart;
-                                metrics.recordLlmLatency(llmLatency);
-                                metrics.recordRequest(request.getTenantId(),
-                                        modelRouter.resolveModelName(request.getTenantId(), request.getUserId()), "success");
-                                return buildDto(request.getSessionId(), answer, null,
-                                        System.currentTimeMillis() - startTime, false);
-                            })
-                            .flatMap(response -> postProcess(request, sanitized, response));
+                                if (toolMode && modelRouter.isFunctionCallEnabled(request.getTenantId())) {
+                                    return executeWithTools(request, sanitized, systemPrompt, history, client, actualModel, startTime);
+                                }
+
+                                long llmStart = System.currentTimeMillis();
+                                return Mono.fromCallable(() ->
+                                                client.prompt()
+                                                        .system(systemPrompt)
+                                                        .messages(buildHistoryMessages(history))
+                                                        .user(sanitized)
+                                                        .call()
+                                                        .content())
+                                        .timeout(Duration.ofSeconds(30))
+                                        .map(answer -> {
+                                            long llmLatency = System.currentTimeMillis() - llmStart;
+                                            metrics.recordLlmLatency(llmLatency);
+                                            metrics.recordRequest(request.getTenantId(), actualModel, "success");
+                                            return buildDto(request.getSessionId(), answer, null,
+                                                    System.currentTimeMillis() - startTime, false, actualModel);
+                                        })
+                                        .flatMap(response -> postProcess(request, sanitized, response));
+                            });
                 });
     }
 
@@ -190,45 +204,53 @@ public class CustomerChatOrchestrator {
                     List<KnowledgeChunk> chunks = tuple.getT3();
                     String profileSummary = tuple.getT4();
                     String systemPrompt = buildSystemPrompt(request.getTenantId(), summary, chunks, profileSummary);
-                    ChatClient client = modelRouter.resolve(request.getTenantId(), request.getUserId());
 
-                    List<Message> messages = new ArrayList<>();
-                    messages.add(new SystemMessage(systemPrompt));
-                    messages.addAll(buildHistoryMessages(history));
-                    messages.add(new UserMessage(sanitized));
+                    // 难度分类 + 按难度路由模型
+                    String emotionLevel = inferEmotionLevel(sanitized);
+                    String topic = inferTopic(sanitized);
+                    return difficultyClassifier.classify(request.getTenantId(), sanitized, emotionLevel, topic)
+                            .flatMapMany(difficulty -> {
+                                ChatClient client = modelRouter.resolveByDifficulty(
+                                        request.getTenantId(), request.getUserId(), difficulty);
+                                String actualModel = modelRouter.resolveModelNameByDifficulty(
+                                        request.getTenantId(), request.getUserId(), difficulty);
 
-                    Flux<String> tokenFlux = client.prompt()
-                            .messages(messages)
-                            .stream()
-                            .content()
-                            .timeout(Duration.ofSeconds(30));
+                                List<Message> messages = new ArrayList<>();
+                                messages.add(new SystemMessage(systemPrompt));
+                                messages.addAll(buildHistoryMessages(history));
+                                messages.add(new UserMessage(sanitized));
 
-                    StringBuilder accumulator = new StringBuilder();
+                                Flux<String> tokenFlux = client.prompt()
+                                        .messages(messages)
+                                        .stream()
+                                        .content()
+                                        .timeout(Duration.ofSeconds(30));
 
-                    return tokenFlux
-                            .doOnNext(accumulator::append)
-                            .doOnComplete(() -> {
-                                String fullAnswer = accumulator.toString();
-                                long elapsed = System.currentTimeMillis() - startTime;
-                                metrics.recordLlmLatency(elapsed);
-                                metrics.recordRequest(request.getTenantId(),
-                                        modelRouter.resolveModelName(request.getTenantId(), request.getUserId()), "success");
+                                StringBuilder accumulator = new StringBuilder();
 
-                                ChatResponse response = buildDto(request.getSessionId(), fullAnswer, null, elapsed, false);
-                                postProcess(request, sanitized, response)
-                                        .subscribeOn(Schedulers.boundedElastic())
-                                        .subscribe();
-                            })
-                            .doOnError(e -> {
-                                log.error("Stream error: {}", e.getMessage());
-                                metrics.recordRequest(request.getTenantId(), "unknown", "stream_error");
+                                return tokenFlux
+                                        .doOnNext(accumulator::append)
+                                        .doOnComplete(() -> {
+                                            String fullAnswer = accumulator.toString();
+                                            long elapsed = System.currentTimeMillis() - startTime;
+                                            metrics.recordLlmLatency(elapsed);
+                                            metrics.recordRequest(request.getTenantId(), actualModel, "success");
+
+                                            ChatResponse response = buildDto(request.getSessionId(), fullAnswer, null, elapsed, false, actualModel);
+                                            postProcess(request, sanitized, response)
+                                                    .subscribeOn(Schedulers.boundedElastic())
+                                                    .subscribe();
+                                        })
+                                        .doOnError(e -> {
+                                            log.error("Stream error: {}", e.getMessage());
+                                            metrics.recordRequest(request.getTenantId(), "unknown", "stream_error");
+                                        });
                             });
                 });
     }
 
     private Mono<ChatResponse> executeWithTools(ChatRequest request, String sanitized, String systemPrompt,
-                                                 List<String> history, ChatClient client, long startTime) {
-        String modelName = modelRouter.resolveModelName(request.getTenantId(), request.getUserId());
+                                                 List<String> history, ChatClient client, String modelName, long startTime) {
         long llmStart = System.currentTimeMillis();
 
         List<Message> messages = new ArrayList<>();
@@ -250,14 +272,14 @@ public class CustomerChatOrchestrator {
 
                     String finalAnswer = answer != null ? answer.toString() : "抱歉，暂时无法处理您的请求，请稍后重试。";
                     ChatResponse response = buildDto(request.getSessionId(), finalAnswer, List.of(),
-                            System.currentTimeMillis() - startTime, false);
+                            System.currentTimeMillis() - startTime, false, modelName);
                     return postProcess(request, sanitized, response);
                 })
                 .onErrorResume(e -> {
                     log.error("Tool execution failed: {}", e.getMessage());
                     ChatResponse response = buildDto(request.getSessionId(),
                             "抱歉，工具调用暂时失败：" + e.getMessage(), List.of(),
-                            System.currentTimeMillis() - startTime, false);
+                            System.currentTimeMillis() - startTime, false, modelName);
                     return postProcess(request, sanitized, response);
                 });
     }
@@ -467,11 +489,11 @@ public class CustomerChatOrchestrator {
 
     private ChatResponse buildDto(String sessionId, String answer,
                                    List<ChatResponse.ToolCallRecord> toolCalls,
-                                   long latencyMs, boolean fallback) {
+                                   long latencyMs, boolean fallback, String model) {
         return ChatResponse.builder()
                 .sessionId(sessionId)
                 .answer(answer)
-                .model("deepseek-chat")
+                .model(model)
                 .toolCalls(toolCalls)
                 .latencyMs(latencyMs)
                 .fallback(fallback)
