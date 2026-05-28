@@ -66,15 +66,19 @@ export function useChat() {
       if (mode === 'stream') {
         const streamMsg = addAssistantMessage('');
         startStreaming(streamMsg.id);
-        await startStream(
-          req,
-          (token) => appendStreamToken(streamMsg.id, token),
-          () => stopStreaming(),
-          (err) => {
-            stopStreaming();
-            setError(err);
-          },
-        );
+        try {
+          await startStream(
+            req,
+            (token) => appendStreamToken(streamMsg.id, token),
+            () => stopStreaming(),
+            (err) => {
+              stopStreaming();
+              setError(err);
+            },
+          );
+        } finally {
+          setRequesting(false);
+        }
       } else {
         const controller = new AbortController();
         abortRef.current = controller;

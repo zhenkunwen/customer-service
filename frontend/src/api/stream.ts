@@ -2,13 +2,19 @@ import type { ChatRequest, StreamEvent } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1/cs';
 
+const defaultApiKeys: Record<string, string> = {
+  default: 'change-me',
+  'tenant-a': 'change-me',
+  'tenant-b': 'change-me',
+};
+
 function getApiKey(): string {
   try {
     const tenantId = localStorage.getItem('cs-tenant-id') || 'default';
-    return localStorage.getItem(`cs-apikey-${tenantId}`)
-      || '';
+    const saved = localStorage.getItem(`cs-apikey-${tenantId}`);
+    return saved || defaultApiKeys[tenantId] || '';
   } catch {
-    return '';
+    return 'change-me';
   }
 }
 
@@ -22,10 +28,10 @@ export async function* postStreamChat(
 ): AsyncGenerator<StreamEvent, void, undefined> {
   const url = `${BASE_URL}/chat/stream`;
 
-  // 合并 AbortSignal：用户中断 + 65s 超时（后端 60s）
+  // 合并 AbortSignal：用户中断 + 120s 超时（后端 90s TimeLimiter）
   let combinedSignal = signal;
   try {
-    const timeoutSignal = AbortSignal.timeout(65000);
+    const timeoutSignal = AbortSignal.timeout(120000);
     combinedSignal = signal
       ? AbortSignal.any([signal, timeoutSignal])
       : timeoutSignal;
@@ -57,6 +63,9 @@ export async function* postStreamChat(
   let buffer = '';
 
   try {
+    let currentEventType = '';
+    let currentData = '';
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -65,17 +74,21 @@ export async function* postStreamChat(
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      let currentEvent = '';
       for (const line of lines) {
-        if (line.startsWith('event:')) {
-          currentEvent = line.slice(6).trim();
-        } else if (line.startsWith('data:')) {
-          const data = line.slice(5).trim();
-          if (currentEvent === 'token' || currentEvent === 'done' || currentEvent === 'error') {
-            yield { event: currentEvent, data } as StreamEvent;
+        if (line === '' || line === '\r') {
+          // SSE 空行 = 事件结束，yield 累积的事件
+          if (currentEventType && (currentEventType === 'token' || currentEventType === 'done' || currentEventType === 'error')) {
+            yield { event: currentEventType, data: currentData } as StreamEvent;
           }
-          currentEvent = '';
+          currentEventType = '';
+          currentData = '';
+        } else if (line.startsWith('event:')) {
+          currentEventType = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          const chunk = line.slice(5).replace(/^ /, '');
+          currentData = currentData ? currentData + '\n' + chunk : chunk;
         }
+        // 忽略注释行（以 : 开头）
       }
     }
   } finally {
