@@ -131,6 +131,16 @@ public class TicketService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    public Mono<Void> delete(Long ticketId) {
+        return Mono.fromRunnable(() -> {
+            if (!ticketRepository.existsById(ticketId)) {
+                throw new IllegalArgumentException("工单不存在");
+            }
+            ticketRepository.deleteById(ticketId);
+            log.info("Ticket deleted: id={}", ticketId);
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
     public Mono<TicketEntity> save(TicketEntity ticket) {
         return Mono.fromCallable(() -> ticketRepository.save(ticket))
                 .subscribeOn(Schedulers.boundedElastic());

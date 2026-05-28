@@ -1,0 +1,3 @@
+[submodule "dive-into-llms"]
+	path = dive-into-llms
+	url = git@github.com:Lordog/dive-into-llms.git

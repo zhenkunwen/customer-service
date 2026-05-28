@@ -100,6 +100,15 @@ public class TicketController {
         return ticketService.close(id, agent.getId(), "ADMIN".equals(agent.getRole()));
     }
 
+    @DeleteMapping("/{id}")
+    public Mono<Map<String, String>> delete(@PathVariable Long id, ServerWebExchange exchange) {
+        AgentEntity agent = getAgent(exchange);
+        if (!"ADMIN".equals(agent.getRole())) {
+            throw new IllegalStateException("仅管理员可删除工单");
+        }
+        return ticketService.delete(id).thenReturn(Map.of("message", "工单已删除"));
+    }
+
     @GetMapping("/stats")
     public Mono<TicketStatsResponse> stats(ServerWebExchange exchange) {
         AgentEntity agent = getAgent(exchange);

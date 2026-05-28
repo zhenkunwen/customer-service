@@ -1,5 +1,6 @@
 package com.cs.customerservice.api.controller;
 
+import com.cs.customerservice.api.dto.AgentLoadResponse;
 import com.cs.customerservice.api.dto.AgentLoginRequest;
 import com.cs.customerservice.api.dto.AgentLoginResponse;
 import com.cs.customerservice.application.agent.AgentService;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -53,6 +55,15 @@ public class AgentController {
                         "username", agent.getUsername(),
                         "role", agent.getRole()
                 ));
+    }
+
+    @GetMapping("/loads")
+    public Mono<List<AgentLoadResponse>> listLoads(ServerWebExchange exchange) {
+        AgentEntity agent = exchange.getAttribute("agent");
+        if (agent == null || (!"ADMIN".equals(agent.getRole()) && !"TEAM_LEAD".equals(agent.getRole()))) {
+            throw new IllegalStateException("仅管理员和团队主管可查看客服负载");
+        }
+        return agentService.listAgentLoads();
     }
 
     @ExceptionHandler({IllegalArgumentException.class})
