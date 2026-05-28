@@ -34,7 +34,7 @@ public class AgentAuthFilter implements WebFilter {
             return chain.filter(exchange);
         }
 
-        if (path.equals("/api/v1/agent/login") || path.equals("/api/v1/agent/register")) {
+        if (path.equals("/api/v1/agent/login")) {
             return chain.filter(exchange);
         }
 

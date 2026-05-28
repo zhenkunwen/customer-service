@@ -9,7 +9,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
@@ -36,9 +36,11 @@ public class TicketController {
     public Mono<Page<TicketResponse>> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String tenantId,
-            Pageable pageable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
             ServerWebExchange exchange) {
         AgentEntity agent = getAgent(exchange);
+        PageRequest pageable = PageRequest.of(page, size);
         if ("ADMIN".equals(agent.getRole()) || "TEAM_LEAD".equals(agent.getRole())) {
             String s = status != null ? status : "PENDING";
             String t = tenantId != null ? tenantId : "default";
@@ -50,6 +52,22 @@ public class TicketController {
     @GetMapping("/{id}")
     public Mono<TicketResponse> get(@PathVariable Long id) {
         return ticketService.findById(id);
+    }
+
+    @PostMapping
+    public Mono<TicketResponse> create(
+            @RequestParam String sessionId,
+            @RequestParam(defaultValue = "default") String tenantId,
+            @RequestParam String question,
+            @RequestParam(defaultValue = "L0") String emotionLevel,
+            @RequestParam(defaultValue = "其他") String topic,
+            @RequestParam(defaultValue = "0") int priority,
+            ServerWebExchange exchange) {
+        AgentEntity agent = getAgent(exchange);
+        if (!"ADMIN".equals(agent.getRole()) && !"TEAM_LEAD".equals(agent.getRole())) {
+            throw new IllegalStateException("无权限创建工单");
+        }
+        return ticketService.create(sessionId, tenantId, question, emotionLevel, topic, priority);
     }
 
     @PutMapping("/{id}/claim")

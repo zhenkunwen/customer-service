@@ -31,4 +31,4 @@ CREATE TABLE tickets (
 
 -- 默认管理员（密码 admin123 的 bcrypt hash）
 INSERT INTO agents (username, password_hash, role, status)
-VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ADMIN', 'OFFLINE');
+VALUES ('admin', '$2b$10$NmT3Jfn6/.PksK.FlpZEs.85BNL2p39kr9h6pZYnq1QkpM7lnbs.u', 'ADMIN', 'OFFLINE');

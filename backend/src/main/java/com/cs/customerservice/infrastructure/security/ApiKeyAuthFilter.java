@@ -36,8 +36,11 @@ public class ApiKeyAuthFilter implements WebFilter {
             return chain.filter(exchange);
         }
 
-        // 只拦截 /api/ 路径
+        // 只拦截 /api/ 路径，Agent/Ticket 路径由 AgentAuthFilter 处理
         if (!path.startsWith("/api/")) {
+            return chain.filter(exchange);
+        }
+        if (path.startsWith("/api/v1/agent/") || path.startsWith("/api/v1/tickets")) {
             return chain.filter(exchange);
         }
 

@@ -136,6 +136,24 @@ public class TicketService {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    public Mono<TicketResponse> create(String sessionId, String tenantId, String question,
+                                        String emotionLevel, String topic, int priority) {
+        return Mono.fromCallable(() -> {
+            TicketEntity ticket = TicketEntity.builder()
+                    .tenantId(tenantId)
+                    .sessionId(sessionId)
+                    .question(question)
+                    .emotionLevel(emotionLevel)
+                    .topic(topic)
+                    .priority(priority)
+                    .status("PENDING")
+                    .build();
+            TicketEntity saved = ticketRepository.save(ticket);
+            log.info("Ticket created: id={}, priority={}", saved.getId(), priority);
+            return toDto(saved);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
     private TicketResponse toDto(TicketEntity e) {
         return TicketResponse.builder()
                 .id(e.getId()).transferEventId(e.getTransferEventId())
