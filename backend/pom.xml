@@ -115,6 +115,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Spring Security Crypto (BCrypt only, no framework) -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
