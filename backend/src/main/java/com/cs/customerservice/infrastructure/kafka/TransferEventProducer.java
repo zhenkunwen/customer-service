@@ -6,8 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 @Component
 public class TransferEventProducer {
@@ -22,7 +24,7 @@ public class TransferEventProducer {
     }
 
     public Mono<Void> send(String sessionId, String payload) {
-        return Mono.<Void>create(sink -> {
+        return Mono.<Void>fromRunnable(() -> {
             ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC, sessionId, payload);
             record.headers().add("sessionId", sessionId.getBytes(StandardCharsets.UTF_8));
             record.headers().add("timestamp", String.valueOf(System.currentTimeMillis())
@@ -30,14 +32,19 @@ public class TransferEventProducer {
 
             kafkaTemplate.send(record).whenComplete((result, ex) -> {
                 if (ex != null) {
-                    log.error("Failed to send transfer event: session={}", sessionId, ex);
-                    sink.error(ex);
+                    log.warn("Failed to send transfer event: session={}", sessionId, ex);
                 } else {
                     log.info("Transfer event sent: session={}, offset={}", sessionId,
                             result.getRecordMetadata().offset());
-                    sink.success();
                 }
             });
-        }).then();
+        })
+                .subscribeOn(Schedulers.boundedElastic())
+                .timeout(Duration.ofSeconds(5))
+                .onErrorResume(e -> {
+                    log.warn("Transfer event send skipped (Kafka unavailable): {}", e.getMessage());
+                    return Mono.empty();
+                })
+                .then();
     }
 }
