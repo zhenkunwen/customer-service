@@ -10,7 +10,9 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,14 +22,25 @@ public class ModelRouter {
 
     private static final Logger log = LoggerFactory.getLogger(ModelRouter.class);
 
+    private static final String DEFAULT_MODEL = "deepseek-chat";
+
     private final ModelRoutingConfig routingConfig;
     private final Map<String, ChatClient> clientCache = new ConcurrentHashMap<>();
     private final ChatModel defaultChatModel;
+    private final String defaultBaseUrl;
+    private final String defaultApiKey;
+    private final RestClient.Builder restClientBuilder;
 
     public ModelRouter(ModelRoutingConfig routingConfig,
-                       ChatModel defaultChatModel) {
+                       ChatModel defaultChatModel,
+                       RestClient.Builder restClientBuilder,
+                       @Value("${spring.ai.openai.base-url}") String defaultBaseUrl,
+                       @Value("${spring.ai.openai.api-key}") String defaultApiKey) {
         this.routingConfig = routingConfig;
         this.defaultChatModel = defaultChatModel;
+        this.restClientBuilder = restClientBuilder;
+        this.defaultBaseUrl = defaultBaseUrl;
+        this.defaultApiKey = defaultApiKey;
     }
 
     public ChatClient resolve(String tenantId, String userId) {
@@ -35,7 +48,7 @@ public class ModelRouter {
                 ? routingConfig.getTenants().get(tenantId)
                 : null;
 
-        String modelName = tenantCfg != null ? tenantCfg.getModelName() : "deepseek-chat";
+        String modelName = tenantCfg != null ? tenantCfg.getModelName() : DEFAULT_MODEL;
 
         if (routingConfig.getGray() != null && routingConfig.getGray().isEnabled()) {
             modelName = resolveGrayModel(userId, modelName);
@@ -57,38 +70,46 @@ public class ModelRouter {
     }
 
     private ChatClient buildClient(TenantModelConfig tenantCfg, String modelName) {
-        double temp = tenantCfg != null ? tenantCfg.getTemperature() : 0.7;
-        int tokens = tenantCfg != null ? tenantCfg.getMaxTokens() : 2048;
+        TenantModelConfig effectiveCfg = tenantCfg != null ? tenantCfg
+                : new TenantModelConfig();
+        double temp = effectiveCfg.getTemperature();
+        int tokens = effectiveCfg.getMaxTokens();
         return buildClient(tenantCfg, modelName, temp, tokens);
     }
 
     private ChatClient buildClient(TenantModelConfig tenantCfg, String modelName,
                                    double temperature, int maxTokens) {
-        ChatModel chatModel;
-        if (tenantCfg != null && tenantCfg.getBaseUrl() != null) {
-            OpenAiApi api = OpenAiApi.builder()
-                    .baseUrl(tenantCfg.getBaseUrl())
-                    .apiKey(tenantCfg.getApiKey())
-                    .build();
-            chatModel = OpenAiChatModel.builder()
-                    .openAiApi(api)
-                    .defaultOptions(OpenAiChatOptions.builder()
-                            .model(modelName)
-                            .temperature(temperature)
-                            .maxTokens(maxTokens)
-                            .build())
-                    .build();
-        } else {
-            chatModel = defaultChatModel;
+        // If it's the default model on the shared API, reuse the auto-configured ChatModel
+        if ((tenantCfg == null || tenantCfg.getBaseUrl() == null)
+                && DEFAULT_MODEL.equals(modelName)) {
+            return ChatClient.builder(defaultChatModel).build();
         }
 
-        return ChatClient.builder(chatModel)
+        // Otherwise: need a dedicated OpenAiChatModel with the target model
+        log.info("Building dedicated ChatClient: model={} temp={} maxTokens={} customBaseUrl={}",
+                modelName, temperature, maxTokens, tenantCfg != null && tenantCfg.getBaseUrl() != null);
+
+        String baseUrl = (tenantCfg != null && tenantCfg.getBaseUrl() != null)
+                ? tenantCfg.getBaseUrl() : defaultBaseUrl;
+        String apiKey = (tenantCfg != null && tenantCfg.getApiKey() != null)
+                ? tenantCfg.getApiKey() : defaultApiKey;
+
+        OpenAiApi api = OpenAiApi.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .restClientBuilder(restClientBuilder)
+                .build();
+
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(api)
                 .defaultOptions(OpenAiChatOptions.builder()
                         .model(modelName)
                         .temperature(temperature)
                         .maxTokens(maxTokens)
                         .build())
                 .build();
+
+        return ChatClient.builder(chatModel).build();
     }
 
     public boolean isFunctionCallEnabled(String tenantId) {
@@ -102,7 +123,7 @@ public class ModelRouter {
         TenantModelConfig cfg = routingConfig.getTenants() != null
                 ? routingConfig.getTenants().get(tenantId)
                 : null;
-        String model = cfg != null ? cfg.getModelName() : "deepseek-chat";
+        String model = cfg != null ? cfg.getModelName() : DEFAULT_MODEL;
         if (routingConfig.getGray() != null && routingConfig.getGray().isEnabled()) {
             model = resolveGrayModel(userId, model);
         }
@@ -124,7 +145,7 @@ public class ModelRouter {
             effectiveTemp = tenantCfg.getStrongTemperature();
             effectiveTokens = tenantCfg.getStrongMaxTokens();
         } else {
-            modelName = tenantCfg != null ? tenantCfg.getModelName() : "deepseek-chat";
+            modelName = tenantCfg != null ? tenantCfg.getModelName() : DEFAULT_MODEL;
             effectiveTemp = tenantCfg != null ? tenantCfg.getTemperature() : 0.7;
             effectiveTokens = tenantCfg != null ? tenantCfg.getMaxTokens() : 2048;
         }
@@ -136,6 +157,8 @@ public class ModelRouter {
         final String finalModelName = modelName;
         final double temperature = effectiveTemp;
         final int maxTokens = effectiveTokens;
+        log.info("resolveByDifficulty: tenant={} userId={} difficulty={} -> model={} temp={} tokens={}",
+                tenantId, userId, difficulty, finalModelName, temperature, maxTokens);
         String cacheKey = tenantId + ":" + finalModelName;
         return clientCache.computeIfAbsent(cacheKey,
                 k -> buildClient(tenantCfg, finalModelName, temperature, maxTokens));

@@ -114,7 +114,7 @@ resilience4j:
   timelimiter:
     instances:
       chat:
-        timeout-duration: 35s
+        timeout-duration: 100s
         cancel-running-future: true
   circuitbreaker:
     instances:
@@ -141,7 +141,7 @@ cs:
     tenants:
       default:
         model-name: deepseek-chat
-        strong-model-name: deepseek-reasoner
+        strong-model-name: deepseek-chat
         temperature: 0.7
         strong-temperature: 0.5
         max-tokens: 2048
@@ -150,7 +150,7 @@ cs:
         difficulty-threshold: 0.6
       tenant-a:
         model-name: deepseek-chat
-        strong-model-name: deepseek-reasoner
+        strong-model-name: deepseek-chat
         temperature: 0.5
         strong-temperature: 0.4
         max-tokens: 1024
@@ -159,7 +159,7 @@ cs:
         difficulty-threshold: 0.7
       tenant-b:
         model-name: deepseek-chat
-        strong-model-name: deepseek-reasoner
+        strong-model-name: deepseek-chat
         temperature: 0.8
         strong-temperature: 0.6
         max-tokens: 4096

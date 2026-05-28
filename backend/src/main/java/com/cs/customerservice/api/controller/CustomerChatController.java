@@ -63,7 +63,7 @@ public class CustomerChatController {
                 request.getSessionId(), request.getTenantId(), request.isToolMode());
         return Mono.just(request)
                 .flatMap(req -> orchestrator.chat(req, false, req.isToolMode()))
-                .timeout(Duration.ofSeconds(35))
+                .timeout(Duration.ofSeconds(120))
                 .onErrorResume(PromptGuardService.PromptGuardException.class,
                         e -> Mono.just(ChatResponse.builder()
                                 .sessionId(request.getSessionId())
@@ -142,7 +142,7 @@ public class CustomerChatController {
                 request.getSessionId(), request.getTenantId());
         return Mono.just(request)
                 .flatMap(req -> orchestrator.chat(req, false, true))
-                .timeout(Duration.ofSeconds(35))
+                .timeout(Duration.ofSeconds(120))
                 .onErrorResume(PromptGuardService.PromptGuardException.class,
                         e -> Mono.just(ChatResponse.builder()
                                 .sessionId(request.getSessionId())
