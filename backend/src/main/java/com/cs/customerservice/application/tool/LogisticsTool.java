@@ -19,9 +19,11 @@ public class LogisticsTool implements Function<LogisticsTool.Request, LogisticsT
     private static final Logger log = LoggerFactory.getLogger(LogisticsTool.class);
 
     private final LogisticsTraceRepository logisticsTraceRepository;
+    private final MallOrderReader mallOrderReader;
 
-    public LogisticsTool(LogisticsTraceRepository logisticsTraceRepository) {
+    public LogisticsTool(LogisticsTraceRepository logisticsTraceRepository, MallOrderReader mallOrderReader) {
         this.logisticsTraceRepository = logisticsTraceRepository;
+        this.mallOrderReader = mallOrderReader;
     }
 
     public record Request(
@@ -46,7 +48,29 @@ public class LogisticsTool implements Function<LogisticsTool.Request, LogisticsT
     @Override
     public Response apply(Request request) {
         log.info("LogisticsTool called: orderId={}", request.orderId);
-
+        var mallOrder = mallOrderReader.findOrderBySn(request.orderId);
+        if (mallOrder.isPresent()) {
+            log.debug("Logistics found in mall: {}", request.orderId);
+            var o = mallOrder.get();
+            Object idObj = o.get("id");
+            if (idObj != null) {
+                Long mallOrderId = idObj instanceof Number ? ((Number) idObj).longValue() : null;
+                var history = mallOrderReader.findOrderHistory(mallOrderId);
+                if (!history.isEmpty()) {
+                    var latest = history.get(0);
+                    String carrier = o.get("delivery_company") != null ? o.get("delivery_company").toString() : "未知";
+                    String trackingNo = o.get("delivery_sn") != null ? o.get("delivery_sn").toString() : "无";
+                    String status = o.get("status") != null ? o.get("status").toString() : "暂无物流信息";
+                    List<TraceNode> nodes = history.stream().map(h -> {
+                        String t = h.get("create_time") != null ? h.get("create_time").toString() : "";
+                        String s = h.get("note") != null ? h.get("note").toString() : "";
+                        return new TraceNode(t, s, "");
+                    }).collect(Collectors.toList());
+                    return new Response(request.orderId, carrier, trackingNo, status, nodes);
+                }
+            }
+            return new Response(request.orderId, "未知", "无", "暂无物流信息", List.of());
+        }
         return logisticsTraceRepository.findByOrderId(request.orderId)
                 .map(trace -> {
                     List<TraceNode> nodes = trace.getNodes().stream()
