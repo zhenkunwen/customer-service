@@ -40,7 +40,8 @@ public class ApiKeyAuthFilter implements WebFilter {
         if (!path.startsWith("/api/")) {
             return chain.filter(exchange);
         }
-        if (path.startsWith("/api/v1/agent/") || path.startsWith("/api/v1/tickets")) {
+        if (path.startsWith("/api/v1/agent/") || path.startsWith("/api/v1/tickets")
+                || path.startsWith("/api/v1/admin")) {
             return chain.filter(exchange);
         }
 

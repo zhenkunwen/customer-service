@@ -30,7 +30,8 @@ public class AgentAuthFilter implements WebFilter {
     public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
 
-        if (!path.startsWith("/api/v1/agent/") && !path.startsWith("/api/v1/tickets")) {
+        if (!path.startsWith("/api/v1/agent/") && !path.startsWith("/api/v1/tickets")
+                && !path.startsWith("/api/v1/admin")) {
             return chain.filter(exchange);
         }
 

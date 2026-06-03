@@ -132,6 +132,8 @@ resilience4j:
 
 # Custom multi-tenant model routing config
 cs:
+  degradation:
+    enabled: false
   security:
     tenant-keys:
       default: ${TENANT_DEFAULT_KEY:change-me}
@@ -177,3 +179,15 @@ logging:
   level:
     com.cs.customerservice: DEBUG
     org.springframework.ai: INFO
+
+# mall 商城数据库（第二数据源，只读）
+mall:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/mall?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: '123456'
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 3000
