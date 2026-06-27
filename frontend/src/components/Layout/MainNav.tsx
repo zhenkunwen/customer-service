@@ -1,13 +1,9 @@
-import { useAgentStore } from '@/stores/agentStore';
-
 interface MainNavProps {
   mode: 'chat' | 'agent';
   onModeChange: (mode: 'chat' | 'agent') => void;
 }
 
 export default function MainNav({ mode, onModeChange }: MainNavProps) {
-  const hasToken = useAgentStore((s) => s.token);
-
   return (
     <nav className="w-14 flex flex-col items-center py-3 gap-2 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shrink-0">
       <button onClick={() => onModeChange('chat')}
