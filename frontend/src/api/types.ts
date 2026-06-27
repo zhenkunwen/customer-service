@@ -70,3 +70,60 @@ export interface SessionConfig {
 }
 
 export type TenantId = 'default' | 'tenant-a' | 'tenant-b';
+
+// ==================== Agent / Ticket 类型 ====================
+
+export interface AgentLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AgentLoginResponse {
+  token: string;
+  role: string;
+  username: string;
+}
+
+export interface AgentLoadItem {
+  id: number;
+  username: string;
+  role: string;
+  status: string;
+  currentLoad: number;
+}
+
+export interface TicketItem {
+  id: number;
+  transferEventId: number | null;
+  tenantId: string;
+  sessionId: string;
+  question: string;
+  emotionLevel: string;
+  topic: string;
+  priority: number;
+  status: string;
+  assignedAgentId: number | null;
+  aiAttemptedSolutions: string | null;
+  resolution: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketStats {
+  pendingCount: number;
+  assignedCount: number;
+  inProgressCount: number;
+  resolvedCount: number;
+  totalCount: number;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
