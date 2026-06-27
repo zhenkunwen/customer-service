@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAgentStore } from '@/stores/agentStore';
-import { resolveTicket, closeTicket, assignTicket, claimTicket } from '@/api/ticketApi';
+import { resolveTicket, closeTicket, assignTicket, claimTicket, getChatHistory } from '@/api/ticketApi';
 import { getAgentLoads } from '@/api/agentAuth';
 import { ApiError } from '@/api/client';
-import type { TicketItem, AgentLoadItem } from '@/api/types';
+import type { TicketItem, AgentLoadItem, ChatRecord } from '@/api/types';
 
 interface Props {
   ticket: TicketItem;
@@ -26,9 +26,19 @@ export default function TicketDetail({ ticket, onBack, onUpdated }: Props) {
   const [agents, setAgents] = useState<AgentLoadItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ChatRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
   const role = useAgentStore((s) => s.role);
   const isAdmin = role === 'ADMIN';
   const isTeamLead = role === 'TEAM_LEAD';
+
+  useEffect(() => {
+    getChatHistory(ticket.id)
+      .then(setHistory)
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  }, [ticket.id]);
 
   const showError = (err: unknown) => {
     setError(err instanceof ApiError ? err.message : '操作失败');
@@ -116,6 +126,35 @@ export default function TicketDetail({ ticket, onBack, onUpdated }: Props) {
             <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">{ticket.aiAttemptedSolutions}</div>
           </section>
         )}
+
+        {/* Chat history */}
+        <section>
+          <button onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer">
+            {showHistory ? '▼' : '▶'} 💬 聊天历史〈{history.length} 轮〉
+            {historyLoading && <span className="text-xs text-gray-400">加载中...</span>}
+          </button>
+          {showHistory && (
+            <div className="space-y-3 max-h-80 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-xl p-3">
+              {history.length === 0 && !historyLoading && (
+                <p className="text-xs text-gray-400 text-center py-4">暂无聊天记录</p>
+              )}
+              {history.map((r) => (
+                <div key={r.id} className="space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">👤 用户</span>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 flex-1">{r.question}</div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-green-600 dark:text-green-400 shrink-0 mt-0.5">🤖 AI ({r.model})</span>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 flex-1 whitespace-pre-wrap">{r.answer}</div>
+                  </div>
+                  <div className="text-xs text-gray-400 text-right">{r.createdAt ? fmtFull(r.createdAt) : ''}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Resolution */}
         {ticket.resolution && (

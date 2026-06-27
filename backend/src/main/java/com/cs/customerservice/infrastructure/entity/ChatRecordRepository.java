@@ -8,5 +8,6 @@ import java.util.List;
 @Repository
 public interface ChatRecordRepository extends JpaRepository<ChatRecord, Long> {
     List<ChatRecord> findBySessionIdOrderByCreatedAtDesc(String sessionId);
+    List<ChatRecord> findBySessionIdOrderByCreatedAtAsc(String sessionId);
     List<ChatRecord> findByTenantId(String tenantId);
 }

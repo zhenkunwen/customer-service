@@ -1,5 +1,6 @@
 package com.cs.customerservice.api.controller;
 
+import com.cs.customerservice.api.dto.ChatRecordResponse;
 import com.cs.customerservice.api.dto.TicketResponse;
 import com.cs.customerservice.api.dto.TicketStatsResponse;
 import com.cs.customerservice.api.dto.TicketUpdateRequest;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -98,6 +100,11 @@ public class TicketController {
     public Mono<TicketResponse> close(@PathVariable Long id, ServerWebExchange exchange) {
         AgentEntity agent = getAgent(exchange);
         return ticketService.close(id, agent.getId(), "ADMIN".equals(agent.getRole()));
+    }
+
+    @GetMapping("/{id}/chat-history")
+    public Mono<List<ChatRecordResponse>> chatHistory(@PathVariable Long id) {
+        return ticketService.getChatHistory(id);
     }
 
     @DeleteMapping("/{id}")

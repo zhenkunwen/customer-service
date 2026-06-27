@@ -1,9 +1,12 @@
 package com.cs.customerservice.application.ticket;
 
+import com.cs.customerservice.api.dto.ChatRecordResponse;
 import com.cs.customerservice.api.dto.TicketResponse;
 import com.cs.customerservice.api.dto.TicketStatsResponse;
 import com.cs.customerservice.api.dto.TicketUpdateRequest;
+import com.cs.customerservice.infrastructure.entity.ChatRecord;
 import com.cs.customerservice.infrastructure.entity.TicketEntity;
+import com.cs.customerservice.infrastructure.entity.ChatRecordRepository;
 import com.cs.customerservice.infrastructure.repository.TicketRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +24,11 @@ public class TicketService {
 
     private static final Logger log = LoggerFactory.getLogger(TicketService.class);
     private final TicketRepository ticketRepository;
+    private final ChatRecordRepository chatRecordRepository;
 
-    public TicketService(TicketRepository ticketRepository) {
+    public TicketService(TicketRepository ticketRepository, ChatRecordRepository chatRecordRepository) {
         this.ticketRepository = ticketRepository;
+        this.chatRecordRepository = chatRecordRepository;
     }
 
     public Mono<Page<TicketResponse>> listByStatus(String status, String tenantId, Pageable pageable) {
@@ -162,6 +167,23 @@ public class TicketService {
             log.info("Ticket created: id={}, priority={}", saved.getId(), priority);
             return toDto(saved);
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<List<ChatRecordResponse>> getChatHistory(Long ticketId) {
+        return Mono.fromCallable(() -> {
+            TicketEntity ticket = ticketRepository.findById(ticketId)
+                    .orElseThrow(() -> new IllegalArgumentException("工单不存在"));
+            return chatRecordRepository.findBySessionIdOrderByCreatedAtAsc(ticket.getSessionId())
+                    .stream().map(this::toChatDto).toList();
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private ChatRecordResponse toChatDto(ChatRecord r) {
+        return ChatRecordResponse.builder()
+                .id(r.getId()).userId(r.getUserId()).model(r.getModel())
+                .question(r.getQuestion()).answer(r.getAnswer())
+                .latencyMs(r.getLatencyMs()).status(r.getStatus())
+                .createdAt(r.getCreatedAt()).build();
     }
 
     private TicketResponse toDto(TicketEntity e) {

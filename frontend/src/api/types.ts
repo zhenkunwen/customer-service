@@ -127,3 +127,14 @@ export interface PageResponse<T> {
   last: boolean;
   empty: boolean;
 }
+
+export interface ChatRecord {
+  id: number;
+  userId: string;
+  model: string;
+  question: string;
+  answer: string;
+  latencyMs: number;
+  status: string;
+  createdAt: string;
+}

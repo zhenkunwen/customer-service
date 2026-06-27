@@ -1,5 +1,5 @@
 import agentClient from './agentClient';
-import type { TicketItem, TicketStats, PageResponse } from './types';
+import type { TicketItem, TicketStats, PageResponse, ChatRecord } from './types';
 
 export async function listTickets(params?: {
   status?: string; tenantId?: string; page?: number; size?: number;
@@ -10,6 +10,11 @@ export async function listTickets(params?: {
 
 export async function getTicket(id: number): Promise<TicketItem> {
   const { data } = await agentClient.get<TicketItem>(`/tickets/${id}`);
+  return data;
+}
+
+export async function getChatHistory(id: number): Promise<ChatRecord[]> {
+  const { data } = await agentClient.get<ChatRecord[]>(`/tickets/${id}/chat-history`);
   return data;
 }
 
