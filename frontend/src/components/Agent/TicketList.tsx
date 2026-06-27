@@ -73,8 +73,8 @@ export default function TicketList({ onOpenTicket }: Props) {
         params.tenantId = 'default';
       }
       const res = await listTickets(params);
-      setTickets(res.content);
-      setTotalPages(res.totalPages);
+      setTickets(res.content ?? []);
+      setTotalPages(res.totalPages ?? 0);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '加载失败');
     } finally {
