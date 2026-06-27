@@ -1,8 +1,10 @@
 import axios, { AxiosError } from 'axios';
 import { ApiError } from './client';
 
+const AGENT_BASE_URL = import.meta.env.VITE_AGENT_BASE_URL || '/api/v1';
+
 const agentClient = axios.create({
-  baseURL: '/api/v1',
+  baseURL: AGENT_BASE_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -30,6 +32,7 @@ agentClient.interceptors.response.use(
       return Promise.reject(new ApiError('认证已过期，请重新登录', 401));
     }
     if (status === 403) return Promise.reject(new ApiError(extractMsg(data) || '无权限执行此操作', 403));
+    if (status === 429) return Promise.reject(new ApiError('请求过快，请稍等', 429));
     if (status === 400) return Promise.reject(new ApiError(extractMsg(data) || '请求参数有误', 400));
     if (status === 500) return Promise.reject(new ApiError('服务器错误，请稍后重试', 500));
     return Promise.reject(new ApiError('请求失败', status));
