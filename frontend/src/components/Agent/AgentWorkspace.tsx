@@ -12,8 +12,15 @@ export default function AgentWorkspace() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try { setAgents(await getAgentLoads()); }
-    catch (err) { setError(err instanceof ApiError ? err.message : '加载失败'); }
+    try {
+        const result = await getAgentLoads();
+        setAgents(Array.isArray(result) ? result : []);
+      }
+    catch (err) {
+      const msg = err instanceof ApiError ? err.message : '[工作台] 客服列表加载失败';
+      console.error('[AgentWorkspace]', err);
+      setError(msg);
+    }
     finally { setLoading(false); }
   }, []);
 

@@ -29,3 +29,14 @@ skills-lock.json
 
 # Docker volumes
 mysql-data/
+
+# H2 file database (local dev)
+backend/data/
+
+# External mall projects
+mall/
+mall-admin-web/
+mall-app-web/
+
+# Build artifacts
+*.tsbuildinfo

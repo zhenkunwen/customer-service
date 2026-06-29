@@ -12,14 +12,14 @@ function SettingsPanel() {
   useEffect(() => {
     getDegradationStatus()
       .then(d => { setEnabled(d.enabled); setLoading(false); })
-      .catch(() => { setLoading(false); });
+      .catch(() => { console.warn('[AdminPanel] 获取降级状态失败'); setLoading(false); });
   }, []);
 
   const handleToggle = async () => {
     setToggling(true);
     setError(null);
     try { const d = await toggleDegradation(); setEnabled(d.enabled); }
-    catch (err) { setError(err instanceof ApiError ? err.message : '操作失败'); }
+    catch (err) { setError(err instanceof ApiError ? err.message : '[设置] 降级模式切换失败'); console.error('[AdminPanel]', err); }
     finally { setToggling(false); }
   };
 

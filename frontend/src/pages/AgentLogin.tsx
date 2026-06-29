@@ -19,7 +19,9 @@ export default function AgentLogin() {
       const res = await login({ username: username.trim(), password });
       setAuth(res.token, res.role, res.username);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '网络异常，请检查连接');
+      const msg = err instanceof ApiError ? err.message : '网络异常，请检查连接';
+      console.error('[登录]', err);
+      setError(msg);
     } finally {
       setLoading(false);
     }

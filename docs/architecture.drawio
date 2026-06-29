@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-06-29T10:00:00.000Z" agent="Mozilla/5.0" version="21.6.5">
+  <diagram name="系统架构图" id="page1">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="0" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" background="#ffffff">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ============= 标题 ============= -->
+        <mxCell id="title" value="AI 智能客服系统架构" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="600" y="10" width="400" height="40"/>
+        </mxCell>
+
+        <!-- ============= 用户层 ============= -->
+        <mxCell id="user" value="用户" style="ellipse;fillColor=#E8F5E9;strokeColor=#4CAF50;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="100" width="100" height="60"/>
+        </mxCell>
+
+        <!-- ============= 前端 ============= -->
+        <mxCell id="frontend" value="React 前端&#xa;Vite + TS + Zustand&#xa;(:5173)" style="rounded=1;fillColor=#E3F2FD;strokeColor=#2196F3;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="100" width="140" height="70"/>
+        </mxCell>
+
+        <!-- ============= 网关层 ============= -->
+        <mxCell id="gateway" value="API Gateway&#xa;:8080" style="rounded=1;fillColor=#FFF3E0;strokeColor=#FF9800;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="450" y="100" width="130" height="70"/>
+        </mxCell>
+
+        <!-- 箭头: 用户 → 前端 → 网关 -->
+        <mxCell id="u2fe" style="edgeStyle=rounded;endArrow=block;edgeStyle=orthogonalEdge;" edge="1" parent="1" source="user" target="frontend">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fe2gw" style="edgeStyle=rounded;endArrow=block;edgeStyle=orthogonalEdge;" edge="1" parent="1" source="frontend" target="gateway">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 安全层 ============= -->
+        <mxCell id="security" value="安全层&#xa;① TraceIdWebFilter&#xa;② ApiKeyAuthFilter&#xa;③ AgentAuthFilter" style="rounded=1;fillColor=#FCE4EC;strokeColor=#E91E63;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="670" y="90" width="150" height="90"/>
+        </mxCell>
+
+        <mxCell id="gateway2security" style="edgeStyle=rounded;endArrow=block;" edge="1" parent="1" source="gateway" target="security">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= Controller 层 ============= -->
+        <mxCell id="controller" value="Controller 层&#xa;ChatController&#xa;AgentController&#xa;TicketController" style="rounded=1;fillColor=#E8EAF6;strokeColor=#3F51B5;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="90" width="150" height="90"/>
+        </mxCell>
+
+        <mxCell id="security2controller" style="edgeStyle=rounded;endArrow=block;" edge="1" parent="1" source="security" target="controller">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 编排器（高亮） ============= -->
+        <mxCell id="orchestrator" value="⭐⭐ 核心编排器 ⭐⭐&#xa;CustomerChatOrchestrator" style="rounded=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=14;fontStyle=1;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="670" y="250" width="200" height="50"/>
+        </mxCell>
+
+        <mxCell id="controller2orch" style="edgeStyle=rounded;endArrow=block;" edge="1" parent="1" source="controller" target="orchestrator">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= PromptGuard ============= -->
+        <mxCell id="promptguard" value="PromptGuard&#xa;提示词防护" style="rounded=1;fillColor=#FCE4EC;strokeColor=#C62828;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="670" y="350" width="130" height="50"/>
+        </mxCell>
+
+        <mxCell id="orch2pg" style="edgeStyle=rounded;endArrow=block;dashed=1;" edge="1" parent="1" source="orchestrator" target="promptguard">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 难度分类器 ============= -->
+        <mxCell id="classifier" value="DifficultyClassifier&#xa;难度分类" style="rounded=1;fillColor=#E8F5E9;strokeColor=#388E3C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="920" y="350" width="130" height="50"/>
+        </mxCell>
+
+        <mxCell id="orch2clf" style="edgeStyle=rounded;endArrow=block;dashed=1;" edge="1" parent="1" source="orchestrator" target="classifier">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 工具层 ============= -->
+        <mxCell id="tools" value="Agent 工具&#xa;OrderTool&#xa;LogisticsTool&#xa;RefundTool" style="rounded=1;fillColor=#F3E5F5;strokeColor=#9C27B0;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="460" width="140" height="90"/>
+        </mxCell>
+
+        <mxCell id="orch2tools" style="edgeStyle=rounded;endArrow=block;dashed=1;" edge="1" parent="1" source="orchestrator" target="tools">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 模型路由 ============= -->
+        <mxCell id="modelrouter" value="ModelRouter&#xa;多租户路由&#xa;金丝雀灰度" style="rounded=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="670" y="480" width="140" height="70"/>
+        </mxCell>
+
+        <mxCell id="orch2mr" style="edgeStyle=rounded;endArrow=block;" edge="1" parent="1" source="orchestrator" target="modelrouter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= DeepSeek ============= -->
+        <mxCell id="llm" value="DeepSeek API&#xa;LLM 服务" style="rounded=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=14;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="480" width="140" height="70"/>
+        </mxCell>
+
+        <mxCell id="mr2llm" style="edgeStyle=rounded;endArrow=block;" edge="1" parent="1" source="modelrouter" target="llm">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="tools2llm" style="edgeStyle=rounded;endArrow=block;dashed=1;" edge="1" parent="1" source="tools" target="llm">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 基础设施 ============= -->
+        <mxCell id="mysql" value="MySQL 8.0&#xa;JPA + Flyway" style="cylinder;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="540" width="120" height="60"/>
+        </mxCell>
+
+        <mxCell id="redis" value="Redis 7&#xa;缓存 + 会话" style="cylinder;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="540" width="120" height="60"/>
+        </mxCell>
+
+        <mxCell id="kafka" value="Kafka&#xa;事件总线 + DLQ" style="cylinder;fillColor=#F3E5F5;strokeColor=#7B1FA2;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="540" width="120" height="60"/>
+        </mxCell>
+
+        <!-- 箭头从编排器到基础设施 -->
+        <mxCell id="orch2mysql" style="edgeStyle=rounded;endArrow=block;dashed=1;exitX=0.2;exitY=1;" edge="1" parent="1" source="orchestrator" target="mysql">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="orch2redis" style="edgeStyle=rounded;endArrow=block;dashed=1;exitX=0.5;exitY=1;" edge="1" parent="1" source="orchestrator" target="redis">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="orch2kafka" style="edgeStyle=rounded;endArrow=block;dashed=1;exitX=0.8;exitY=1;" edge="1" parent="1" source="orchestrator" target="kafka">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ============= 可观测性 ============= -->
+        <mxCell id="obs" value="可观测性&#xa;Micrometer&#xa;Prometheus&#xa;Brave Tracing&#xa;Actuator" style="rounded=1;fillColor=#ECEFF1;strokeColor=#607D8B;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="680" width="150" height="90"/>
+        </mxCell>
+
+        <!-- ============= 图例 ============= -->
+        <mxCell id="legend" value="图例&#xa;━━━ 同步调用&#xa;┅┅┅ 异步/事件&#xa;━━ 实线 = 主流程" style="text;html=1;fontSize=12;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="80" width="200" height="80"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

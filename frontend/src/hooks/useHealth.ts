@@ -24,6 +24,7 @@ export function useHealth() {
     } catch {
       setStatus('DOWN');
       setDetails({});
+      console.warn('[Health] 后端健康检查失败');
     }
   }, []);
 

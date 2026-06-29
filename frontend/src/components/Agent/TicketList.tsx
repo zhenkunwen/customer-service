@@ -76,7 +76,9 @@ export default function TicketList({ onOpenTicket }: Props) {
       setTickets(res.content ?? []);
       setTotalPages(res.totalPages ?? 0);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '加载失败');
+      const msg = err instanceof ApiError ? err.message : '[工单列表] 加载工单失败';
+      console.error('[TicketList]', err);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -84,33 +86,35 @@ export default function TicketList({ onOpenTicket }: Props) {
 
   const loadStats = useCallback(async () => {
     if (!isAdminView) return;
-    try { setStats(await getTicketStats()); } catch { /* ignore stats errors */ }
+    try { setStats(await getTicketStats() ?? null); } catch { console.warn('[TicketList] 加载统计失败'); }
   }, [isAdminView]);
 
   useEffect(() => { loadTickets(); }, [loadTickets]);
   useEffect(() => { loadStats(); }, []);
 
-  const doAction = async (action: () => Promise<unknown>) => {
+  const doAction = async (action: () => Promise<unknown>, label: string) => {
     setError(null);
     try {
       await action();
       await Promise.all([loadTickets(), loadStats()]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '操作失败');
+      const msg = err instanceof ApiError ? err.message : `[${label}] 操作失败`;
+      console.error(`[TicketList/${label}]`, err);
+      setError(msg);
     }
   };
 
   const handleClaim = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setActionLoading(id);
-    await doAction(() => claimTicket(id));
+    await doAction(() => claimTicket(id), '认领');
     setActionLoading(null);
   };
 
   const handleClose = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setActionLoading(id);
-    await doAction(() => closeTicket(id));
+    await doAction(() => closeTicket(id), '关闭');
     setActionLoading(null);
   };
 

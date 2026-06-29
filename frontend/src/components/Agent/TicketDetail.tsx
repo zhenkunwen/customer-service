@@ -35,20 +35,22 @@ export default function TicketDetail({ ticket, onBack, onUpdated }: Props) {
 
   useEffect(() => {
     getChatHistory(ticket.id)
-      .then(setHistory)
-      .catch(() => {})
+      .then(h => { if (Array.isArray(h)) setHistory(h); })
+      .catch(() => { console.warn('[TicketDetail] 加载聊天记录失败'); })
       .finally(() => setHistoryLoading(false));
   }, [ticket.id]);
 
-  const showError = (err: unknown) => {
-    setError(err instanceof ApiError ? err.message : '操作失败');
+  const showError = (err: unknown, label: string) => {
+    const msg = err instanceof ApiError ? err.message : `[${label}] 操作失败`;
+    console.error(`[TicketDetail/${label}]`, err);
+    setError(msg);
     setTimeout(() => setError(null), 3000);
   };
 
   const handleClaim = async () => {
     setLoading(true);
     try { await claimTicket(ticket.id); onUpdated(); }
-    catch (err) { showError(err); }
+    catch (err) { showError(err, '认领'); }
     finally { setLoading(false); }
   };
 
@@ -56,27 +58,30 @@ export default function TicketDetail({ ticket, onBack, onUpdated }: Props) {
     if (!resolution.trim()) return;
     setLoading(true);
     try { await resolveTicket(ticket.id, resolution.trim()); onUpdated(); }
-    catch (err) { showError(err); }
+    catch (err) { showError(err, '解决'); }
     finally { setLoading(false); }
   };
 
   const handleClose = async () => {
     setLoading(true);
     try { await closeTicket(ticket.id); onUpdated(); }
-    catch (err) { showError(err); }
+    catch (err) { showError(err, '关闭'); }
     finally { setLoading(false); }
   };
 
   const handleAssign = async (targetAgentId: number) => {
     setLoading(true);
     try { await assignTicket(ticket.id, targetAgentId); setShowAssign(false); onUpdated(); }
-    catch (err) { showError(err); }
+    catch (err) { showError(err, '派发'); }
     finally { setLoading(false); }
   };
 
   const loadAgents = async () => {
-    try { setAgents(await getAgentLoads()); setShowAssign(true); }
-    catch (err) { showError(err); }
+    try {
+      const result = await getAgentLoads();
+      setAgents(Array.isArray(result) ? result : []);
+      setShowAssign(true);
+    } catch (err) { showError(err, '加载客服列表'); }
   };
 
   const statusLabel = ({ PENDING: '待认领', ASSIGNED: '处理中', IN_PROGRESS: '处理中', RESOLVED: '已解决', CLOSED: '已关闭' } as Record<string, string>)[ticket.status] || ticket.status;

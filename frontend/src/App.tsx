@@ -11,9 +11,19 @@ import { useAgentStore } from '@/stores/agentStore';
 export default function App() {
   const [mode, setMode] = useState<'chat' | 'agent'>('chat');
   const agentToken = useAgentStore((s) => s.token);
+  const clearAuth = useAgentStore((s) => s.clearAuth);
   const error = useUIStore((s) => s.error);
   const setError = useUIStore((s) => s.setError);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const agentFirstEntry = useRef(true);
+
+  const handleModeChange = (newMode: 'chat' | 'agent') => {
+    if (newMode === 'agent' && agentFirstEntry.current) {
+      agentFirstEntry.current = false;
+      if (agentToken) clearAuth();
+    }
+    setMode(newMode);
+  };
 
   useEffect(() => {
     if (error) {
@@ -43,7 +53,7 @@ export default function App() {
 
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900">
-      <MainNav mode={mode} onModeChange={setMode} />
+      <MainNav mode={mode} onModeChange={handleModeChange} />
       {mode === 'chat' ? (
         <div className="flex-1 flex flex-col lg:flex-row min-w-0">
           <ConfigSidebar />
