@@ -4,101 +4,32 @@
 
 ---
 
-## 系统架构
-
-```mermaid
-flowchart TB
-    User(["用户"]) -->|"SSE / JSON"| React["React 前端"]
-    React -->|"POST /api/..."| ApiKey["ApiKeyAuthFilter 租户鉴权"]
-    ApiKey -->|"X-API-Key 匹配"| Router["ModelRouter 多租户模型路由"]
-    Router -->|"金丝雀灰度"| ChatAPI["API 端点 chat / stream / tool"]
-    ChatAPI --> Orchestrator["CustomerChatOrchestrator 核心编排器"]
-    
-    subgraph Orchestrator["编排器内部流程"]
-        direction TB
-        PG["PromptGuard 提示词防护"] --> Parrallel{"Mono.zip 四路并发"}
-        Parrallel --> Mem["对话记忆 Redis List"]
-        Parrallel --> RAG["RAG 知识库"]
-        Parrallel --> Profile["用户画像"]
-        Parrallel --> Summary["会话摘要"]
-        Parrallel --> Classifier["DifficultyClassifier 难度分类"]
-        Classifier -->|"SIMPLE"| Light["轻量模型 deepseek-chat"]
-        Classifier -->|"COMPLEX"| Strong["强模型 deepseek-reasoner"]
-    end
-    
-    subgraph Tools["Function Calling 工具"]
-        Order["OrderTool 订单查询"]
-        Logistics["LogisticsTool 物流追踪"]
-        Refund["RefundTool 退货政策"]
-    end
-    
-    Orchestrator -->|"工具调用"| Tools
-    Orchestrator -->|"降级回调"| Fallback["chatFallback > Kafka + 工单"]
-    
-    subgraph Infrastructure["基础设施层"]
-        MySQL[("MySQL 8.0 JPA + Hibernate")]
-        Redis[("Redis 7 缓存 + 会话")]
-        Kafka["Kafka 事件总线 + DLQ"]
-        LLM["DeepSeek API LLM 服务"]
-    end
-    
-    Orchestrator -->|"持久化"| MySQL
-    Orchestrator -->|"缓存/记忆"| Redis
-    Orchestrator -->|"事件驱动"| Kafka
-    Light --> LLM
-    Strong --> LLM
-    Tools --> MySQL
-    
-    subgraph Observability["可观测性"]
-        Prom["Prometheus 指标"]
-        Trace["Brave 链路追踪"]
-        Health["Actuator 健康检查"]
-    end
-    
-    Prom -.->|"采集"| Orchestrator
-    Trace -.->|"追踪"| Orchestrator
-```
-
----
-
 ## 快速启动
 
 ### 前置要求
+- Docker & Docker Compose、Java 17+、Node.js 18+
+- DeepSeek API Key ([platform.deepseek.com](https://platform.deepseek.com))
 
-- Docker & Docker Compose
-- Java 17+
-- Node.js 18+
-- DeepSeek API Key ([deepseek.com](https://platform.deepseek.com))
-
-### 1. 启动基础设施
+### 启动
 
 ```bash
+# 1. 基础设施 (MySQL + Redis + Kafka)
 docker-compose up -d
-```
 
-### 2. 启动后端（H2 内存模式，无需 MySQL）
-
-```bash
+# 2. 后端 (H2 内存模式，无需 MySQL)
 cd backend
 export DEEPSEEK_API_KEY=sk-your-key-here
 mvn spring-boot:run
-```
 
-### 3. 启动前端
-
-```bash
+# 3. 前端
 cd frontend
 npm install
 npm run dev
 ```
 
-### 4. 验证
+### 验证
 
 ```bash
-# 健康检查
-curl http://localhost:8080/actuator/health
-
-# 测试对话
 curl -X POST http://localhost:8080/api/v1/cs/chat \
   -H "Content-Type: application/json" \
   -H "X-API-Key: default-api-key-change-me" \
@@ -107,193 +38,59 @@ curl -X POST http://localhost:8080/api/v1/cs/chat \
 
 ---
 
-## 核心模块设计
+## 核心模块
 
-### 1. 对话编排流程
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant F as ApiKeyAuthFilter
-    participant C as ChatController
-    participant O as CustomerChatOrchestrator
-    participant PG as PromptGuard
-    participant Cache as 多级缓存
-    participant Mem as 对话记忆
-    participant DB as 知识库+画像
-    participant DC as DifficultyClassifier
-    participant LLM as DeepSeek
-    
-    U->>F: POST /chat
-    F->>F: X-API-Key 匹配租户
-    F->>C: 放行
-    C->>O: chat(request)
-    O->>PG: sanitize(question)
-    alt 触发规则
-        PG-->>C: 异常统一返回友好提示
-        C-->>U: 输入包含不安全内容
-    end
-    O->>Cache: get(tenantId, question)
-    alt 缓存命中
-        Cache-->>O: 直接返回
-        O-->>U: 缓存回答
-    else 缓存未命中
-        O->>Mem: loadRecentMessages(sessionId, 8)
-        O->>Mem: loadSummary(sessionId)
-        O->>DB: search(tenantId, question)
-        O->>DB: getProfileSummary(tenantId, userId)
-        Note over O: Mono.zip 四路并发
-        O->>DC: classify(question, emotionLevel)
-        alt toolMode=true
-            O->>LLM: prompt + 3 tools
-            LLM->>O: tool_calls 执行工具 最终回答
-        else
-            O->>LLM: prompt + 上下文
-            LLM-->>O: 回答
-        end
-        O->>Mem: appendMessage
-        O->>Cache: put(question, answer)
-        O->>Kafka: send chatEvent
-        alt 回答含 转人工
-            O->>Kafka: send transferEvent
-            O->>MySQL: createTicket
-        end
-        O-->>U: ChatResponse
-    end
-```
-
-### 2. 工单状态机
-
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING: AI 判定转人工
-    PENDING --> ASSIGNED: 客服认领或自动分配
-    PENDING --> CLOSED: 管理员关闭
-    ASSIGNED --> IN_PROGRESS: 开始处理
-    ASSIGNED --> RESOLVED: 提交解决方案
-    IN_PROGRESS --> RESOLVED: 提交解决方案
-    RESOLVED --> CLOSED: 确认关闭
-    CLOSED --> [*]
-    
-    note right of PENDING: L3(愤怒)自动分配 按最小负载
-    note right of ASSIGNED: 仅认领人可操作
-```
-
-### 3. 多租户模型路由
-
-```mermaid
-flowchart LR
-    Req["请求"] --> Key{"X-API-Key"}
-    Key -->|"key-a"| TA["Tenant-A 配置"]
-    Key -->|"key-b"| TB["Tenant-B 配置"]
-    Key -->|"key-default"| TD["Default 配置"]
-    
-    TA --> TF{"金丝雀灰度"}
-    TB --> TF
-    TD --> TF
-    
-    TF -->|"hash % 100 < 10%"| Gray["灰度模型 v2"]
-    TF -->|"其余"| Stable["稳定模型 deepseek-chat"]
-    
-    Gray --> Client["ChatClient 实例 缓存"]
-    Stable --> Client
-```
-
-### 4. 缓存层级
-
-```mermaid
-flowchart LR
-    Req["用户问题"] --> L1["Caffeine L1 本地内存 毫秒级"]
-    L1 -->|"未命中"| L2["Redis L2 1h TTL 跨实例共享"]
-    L2 -->|"命中回填 L1"| L1
-    L2 -->|"未命中"| LLM["调用 LLM"]
-    LLM -->|"写入 L1+L2"| L1
-```
-
-### 5. Resilience4j 防护层
-
-```mermaid
-flowchart TB
-    Req["请求"] --> RL["RateLimiter 限流"]
-    RL --> TL["TimeLimiter 超时 90s"]
-    TL --> CB["CircuitBreaker 熔断"]
-    CB --> BH["Bulkhead 舱壁隔离"]
-    BH --> Biz["业务逻辑"]
-    
-    Biz -->|"异常"| Fallback["chatFallback > 友好提示 + Kafka + 工单"]
-    
-    RL -.->|"超限"| Fallback
-    TL -.->|"超时"| Fallback
-    CB -.->|"熔断"| Fallback
-    BH -.->|"满额"| Fallback
-```
-
----
-
-## 特性清单
-
-| 特性 | 说明 |
+| 模块 | 说明 |
 |------|------|
-| **AI 驱动对话** | 集成 DeepSeek，支持普通对话、SSE 流式、Function Calling 三种模式 |
-| **多租户架构** | 租户级 API Key 认证、独立模型配置、金丝雀灰度发布 |
-| **工具调用** | 订单查询/物流追踪/退货政策，LLM 自主决策调用 |
-| **提示注入防护** | 30+ 正则规则过滤 SQL 注入、XSS、越狱攻击，租户级敏感词 |
-| **弹性容错** | Resilience4j 限流/熔断/降级/隔离，降级自动转人工 |
-| **多层缓存** | Caffeine L1 + Redis L2 两级缓存，降低 LLM 调用 |
-| **事件驱动** | Kafka 异步处理对话记录与转人工事件，含死信队列 |
-| **对话记忆** | Redis List 存储多轮历史，LLM 自动摘要压缩 |
-| **可观测性** | Prometheus 指标 + Brave 全链路追踪 + Actuator 健康检查 |
+| **编排引擎** | Mono.zip 四路并发加载对话记忆+RAG+用户画像，难度规则分类器 SIMPLE/COMPLEX 两级路由，强/弱模型参数独立配置 |
+| **工具调用** | 3 个 Function Calling 工具(订单/物流/退货)，双源查询 + 多级降级兜底，异常分类降级不级联崩溃 |
+| **弹性容错** | Resilience4j 四层防护(限流/超时/熔断/舱壁)，全局降级开关一键切换无需重启，降级回调自动写 Kafka + 创建工单 |
+| **安全防护** | 自研 PromptGuard 30+ 正则过滤注入/越狱/SQL/XSS/路径遍历，租户级敏感词独立隔离 |
+| **基础设施** | Caffeine L1+Redis L2 两级缓存、Kafka 事件驱动含死信队列、Redis 对话记忆自动摘要、Brave 全链路追踪、Prometheus 指标 |
+| **工单系统** | 全生命周期管理 PENDING→CLOSED，L3 工单按最小负载自动分配在线客服 |
 
 ## 技术栈
 
 | 维度 | 技术 |
 |------|------|
-| **语言** | Java 17 |
-| **框架** | Spring Boot 3.2, Spring WebFlux, Spring AI |
-| **AI 模型** | DeepSeek Chat (兼容 OpenAI API) |
-| **消息队列** | Apache Kafka + 死信队列 |
-| **缓存** | Redis 7 (Reactive), Caffeine |
-| **数据库** | MySQL 8.0 (JPA + Flyway), H2 (本地开发) |
-| **容错** | Resilience4j (限流/熔断/隔离/超时) |
-| **监控** | Micrometer, Prometheus, Brave Tracing |
-| **前端** | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
-| **部署** | Docker Compose, Kubernetes (HPA) |
+| 语言 | Java 17 |
+| 框架 | Spring Boot 3.2 WebFlux, Spring AI |
+| AI 模型 | DeepSeek Chat (OpenAI 兼容) |
+| 消息队列 | Apache Kafka + 死信队列 |
+| 缓存 | Redis 7 Reactive, Caffeine |
+| 数据库 | MySQL 8.0 (JPA + Flyway), H2 (本地开发) |
+| 容错 | Resilience4j |
+| 监控 | Micrometer, Prometheus, Brave Tracing |
+| 前端 | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
+| 部署 | Docker Compose, Kubernetes (HPA) |
 
 ## 项目结构
 
 ```
-├── backend/
-│   └── src/main/java/com/cs/customerservice/
-│       ├── api/controller/      # ChatController, AgentController, TicketController
-│       ├── api/dto/             # ChatRequest/Response, TicketDTO
-│       ├── application/orchestrator/  # CustomerChatOrchestrator (核心编排器)
-│       ├── application/ai/      # DifficultyClassifier
-│       ├── application/service/ # 对话记忆、多级缓存、用户画像
-│       ├── application/ticket/  # TicketService, TicketAssignmentService
-│       ├── application/tool/    # OrderTool, LogisticsTool, RefundTool
-│       ├── infrastructure/config/   # Cache, Kafka, ChatClient, ModelRouting
-│       ├── infrastructure/entity/   # JPA 实体
-│       ├── infrastructure/kafka/    # 生产者/消费者/死信
-│       ├── infrastructure/model/    # ModelRouter
-│       ├── infrastructure/security/ # API Key / Agent Token 鉴权
-│       └── infrastructure/tracing/  # TraceIdWebFilter
+├── backend/src/main/java/com/cs/customerservice/
+│   ├── api/controller/             # REST 控制器
+│   ├── application/orchestrator/   # 核心编排器
+│   ├── application/ai/             # 难度分类器
+│   ├── application/service/        # 对话记忆、多级缓存、用户画像
+│   ├── application/ticket/         # 工单服务、自动分配
+│   ├── application/tool/           # OrderTool, LogisticsTool, RefundTool
+│   └── infrastructure/             # 配置、安全、Kafka、持久化、追踪
 ├── frontend/src/
-│   ├── api/                     # Axios 客户端、SSE 流式处理
-│   ├── components/              # Chat, Agent, Admin 组件
-│   ├── hooks/                   # useChat, useStream
-│   └── stores/                  # Zustand 状态管理
-├── k8s/                         # Kubernetes (Deployment + HPA)
-├── docker-compose.yml           # MySQL + Redis + Kafka
-└── api-docs.md                  # 完整 API 文档
+│   ├── api/                        # Axios 客户端、SSE 流式处理
+│   ├── components/                 # Chat, Agent, Admin 组件
+│   └── stores/                     # Zustand 状态管理
+├── k8s/                            # Kubernetes (Deployment + HPA)
+└── docker-compose.yml
 ```
 
 ## 部署
 
-### Kubernetes
-
 ```bash
-kubectl apply -f k8s/
-# 3 副本 Deployment + HPA 3-20 Pod 基于 CPU/Memory/QPS
+# Kubernetes
+kubectl apply -f k8s/   # 3 副本 + HPA 3-20 Pod
+
+# Docker Compose 生产
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 ---
