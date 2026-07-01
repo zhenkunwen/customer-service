@@ -4,6 +4,7 @@ import com.cs.customerservice.api.dto.ChatRecordResponse;
 import com.cs.customerservice.api.dto.TicketResponse;
 import com.cs.customerservice.api.dto.TicketStatsResponse;
 import com.cs.customerservice.api.dto.TicketUpdateRequest;
+import com.cs.customerservice.infrastructure.entity.AgentEntity;
 import com.cs.customerservice.infrastructure.entity.ChatRecord;
 import com.cs.customerservice.infrastructure.entity.TicketEntity;
 import com.cs.customerservice.infrastructure.entity.ChatRecordRepository;
@@ -17,7 +18,9 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class TicketService {
@@ -25,10 +28,13 @@ public class TicketService {
     private static final Logger log = LoggerFactory.getLogger(TicketService.class);
     private final TicketRepository ticketRepository;
     private final ChatRecordRepository chatRecordRepository;
+    private final TicketAssignmentService ticketAssignmentService;
 
-    public TicketService(TicketRepository ticketRepository, ChatRecordRepository chatRecordRepository) {
+    public TicketService(TicketRepository ticketRepository, ChatRecordRepository chatRecordRepository,
+                         TicketAssignmentService ticketAssignmentService) {
         this.ticketRepository = ticketRepository;
         this.chatRecordRepository = chatRecordRepository;
+        this.ticketAssignmentService = ticketAssignmentService;
     }
 
     public Mono<Page<TicketResponse>> listByStatus(String status, String tenantId, Pageable pageable) {
@@ -82,11 +88,11 @@ public class TicketService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    public Mono<TicketResponse> resolve(Long ticketId, Long agentId, TicketUpdateRequest request) {
+    public Mono<TicketResponse> resolve(Long ticketId, Long agentId, TicketUpdateRequest request, boolean isTeamLead) {
         return Mono.fromCallable(() -> {
             TicketEntity ticket = ticketRepository.findById(ticketId)
                     .orElseThrow(() -> new IllegalArgumentException("工单不存在"));
-            if (!ticket.getAssignedAgentId().equals(agentId)) {
+            if (!isTeamLead && !ticket.getAssignedAgentId().equals(agentId)) {
                 throw new IllegalStateException("只能处理分配给自己的工单");
             }
             ticket.setStatus("RESOLVED");
@@ -98,11 +104,11 @@ public class TicketService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    public Mono<TicketResponse> close(Long ticketId, Long agentId, boolean isAdmin) {
+    public Mono<TicketResponse> close(Long ticketId, Long agentId, boolean isTeamLead) {
         return Mono.fromCallable(() -> {
             TicketEntity ticket = ticketRepository.findById(ticketId)
                     .orElseThrow(() -> new IllegalArgumentException("工单不存在"));
-            if (!isAdmin && !agentId.equals(ticket.getAssignedAgentId())) {
+            if (!isTeamLead && !agentId.equals(ticket.getAssignedAgentId())) {
                 throw new IllegalStateException("只能关闭分配给自己的工单");
             }
             ticket.setStatus("CLOSED");
@@ -165,8 +171,14 @@ public class TicketService {
                     .build();
             TicketEntity saved = ticketRepository.save(ticket);
             log.info("Ticket created: id={}, priority={}", saved.getId(), priority);
-            return toDto(saved);
-        }).subscribeOn(Schedulers.boundedElastic());
+            return saved;
+        }).flatMap(saved ->
+                ticketAssignmentService.autoAssign(saved)
+                        .then(Mono.fromCallable(() -> toDto(
+                                ticketRepository.findById(saved.getId())
+                                        .orElse(saved)
+                        )))
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     public Mono<List<ChatRecordResponse>> getChatHistory(Long ticketId) {
@@ -175,6 +187,32 @@ public class TicketService {
                     .orElseThrow(() -> new IllegalArgumentException("工单不存在"));
             return chatRecordRepository.findBySessionIdOrderByCreatedAtAsc(ticket.getSessionId())
                     .stream().map(this::toChatDto).toList();
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<Map<String, Object>> addAgentMessage(Long ticketId, AgentEntity agent, String message) {
+        return Mono.fromCallable(() -> {
+            TicketEntity ticket = ticketRepository.findById(ticketId)
+                    .orElseThrow(() -> new IllegalArgumentException("工单不存在"));
+            ChatRecord record = ChatRecord.builder()
+                    .sessionId(ticket.getSessionId())
+                    .tenantId(ticket.getTenantId())
+                    .userId("agent:" + agent.getUsername())
+                    .model("__agent__")
+                    .question("")
+                    .answer(message)
+                    .latencyMs(0L)
+                    .status("AGENT_MSG")
+                    .createdAt(Instant.now())
+                    .build();
+            chatRecordRepository.save(record);
+            log.info("Agent message sent: ticketId={}, agent={}", ticketId, agent.getUsername());
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", record.getId());
+            result.put("message", message);
+            result.put("sender", agent.getUsername());
+            result.put("createdAt", record.getCreatedAt().toString());
+            return result;
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
