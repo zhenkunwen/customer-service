@@ -26,6 +26,6 @@ public interface TicketRepository extends JpaRepository<TicketEntity, Long> {
     long countByAssignedAgentIdAndStatusIn(Long agentId, List<String> statuses);
 
     @Query("SELECT t.assignedAgentId, COUNT(t) FROM TicketEntity t " +
-           "WHERE t.assignedAgentId IN :agentIds AND t.status = 'ASSIGNED' GROUP BY t.assignedAgentId")
+           "WHERE t.assignedAgentId IN :agentIds AND t.status IN ('ASSIGNED', 'IN_PROGRESS') GROUP BY t.assignedAgentId")
     List<Object[]> countAssignedByAgentIds(@Param("agentIds") List<Long> agentIds);
 }
