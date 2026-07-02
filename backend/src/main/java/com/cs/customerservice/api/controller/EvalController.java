@@ -6,6 +6,7 @@ import com.cs.customerservice.application.eval.EvalTestCase;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -26,12 +27,15 @@ public class EvalController {
     }
 
     @GetMapping("/testcases")
-    public ResponseEntity<List<EvalTestCase>> listTestCases(
+    public Mono<ResponseEntity<List<EvalTestCase>>> listTestCases(
             @RequestParam(defaultValue = "default") String tenantId) {
-        List<EvalTestCase> all = evalService.loadTestCases();
-        List<EvalTestCase> filtered = all.stream()
-                .filter(tc -> tenantId.equals(tc.getTenantId()))
-                .toList();
-        return ResponseEntity.ok(filtered);
+        return Mono.fromCallable(() -> evalService.loadTestCases())
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(all -> {
+                    List<EvalTestCase> filtered = all.stream()
+                            .filter(tc -> tenantId.equals(tc.getTenantId()))
+                            .toList();
+                    return ResponseEntity.ok(filtered);
+                });
     }
 }
