@@ -154,6 +154,19 @@
             <artifactId>elasticsearch-java</artifactId>
             <version>${elasticsearch.version}</version>
         </dependency>
+
+        <!-- PDF parsing -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.1</version>
+        </dependency>
+        <!-- Word (docx) parsing -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
     </dependencies>
 
     <repositories>

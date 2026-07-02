@@ -18,4 +18,11 @@ public class EsKnowledgeDoc {
     private String content;
     private double score;
     private List<Float> embedding;
+
+    private String source;
+    private String section;
+    private int chunkIndex;
+    private int totalChunks;
+    private Integer pageNum;
+    private String docType;
 }
