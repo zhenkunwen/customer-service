@@ -181,6 +181,24 @@ cs:
       port: ${ES_PORT:9200}
       protocol: ${ES_PROTOCOL:http}
     embedding-model: text-embedding-v2
+    chunk:
+      strategies:
+        tech:
+          min-size: 300
+          max-size: 800
+          overlap: 80
+        narrative:
+          min-size: 500
+          max-size: 1200
+          overlap: 120
+        policy:
+          min-size: 400
+          max-size: 1500
+          overlap: 100
+      fallback:
+        min-size: 400
+        max-size: 1000
+        overlap: 100
 
 logging:
   pattern:
