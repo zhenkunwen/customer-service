@@ -4,6 +4,7 @@ import com.cs.customerservice.application.service.KnowledgeRetrievalPort;
 import com.cs.customerservice.domain.KnowledgeChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@ConditionalOnMissingBean(EsKnowledgeAdapter.class)
 public class MemoryKnowledgeAdapter implements KnowledgeRetrievalPort {
 
     private static final Logger log = LoggerFactory.getLogger(MemoryKnowledgeAdapter.class);
