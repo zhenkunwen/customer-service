@@ -173,6 +173,15 @@ cs:
       target-model: deepseek-chat
       percentage: 0
 
+  # Elasticsearch 向量知识库
+  knowledge:
+    es:
+      enabled: ${ES_KNOWLEDGE_ENABLED:true}
+      host: ${ES_HOST:localhost}
+      port: ${ES_PORT:9200}
+      protocol: ${ES_PROTOCOL:http}
+    embedding-model: text-embedding-v2
+
 logging:
   pattern:
     level: "%5p [%X{traceId:-}--%X{spanId:-}]"
