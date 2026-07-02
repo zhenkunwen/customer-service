@@ -10,7 +10,11 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class DeepSeekEmbeddingService {
@@ -18,33 +22,33 @@ public class DeepSeekEmbeddingService {
     private static final Logger log = LoggerFactory.getLogger(DeepSeekEmbeddingService.class);
 
     private final WebClient webClient;
-    private final String apiKey;
     private final String model;
 
-    /** 简单 LRU 缓存，避免对相同文本重复调用 API */
-    private final LinkedHashMap<String, List<Float>> cache;
+    /** 线程安全的 LRU 缓存，避免对相同文本重复调用 API */
+    private final Map<String, List<Float>> cache;
 
     public DeepSeekEmbeddingService(
             @Value("${spring.ai.openai.base-url:https://api.deepseek.com}") String baseUrl,
             @Value("${spring.ai.openai.api-key:}") String apiKey,
             @Value("${cs.knowledge.embedding-model:text-embedding-v2}") String model) {
-        this.apiKey = apiKey;
         this.model = model;
+        // 标准化 baseUrl，去除尾随斜杠
+        String normalizedUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.webClient = WebClient.builder()
-                .baseUrl(baseUrl + "/v1/embeddings")
+                .baseUrl(normalizedUrl + "/v1/embeddings")
                 .defaultHeader("Content-Type", "application/json")
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .build();
-        this.cache = new LinkedHashMap<>() {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, List<Float>> eldest) {
-                return size() > 1000;
-            }
-        };
+        this.cache = Collections.synchronizedMap(
+                new LinkedHashMap<>(16, 0.75f, true) {
+                    @Override
+                    protected boolean removeEldestEntry(Map.Entry<String, List<Float>> eldest) {
+                        return size() > 1000;
+                    }
+                });
     }
 
     public Mono<List<Float>> embed(String text) {
-        // 缓存命中
         List<Float> cached = cache.get(text);
         if (cached != null) {
             return Mono.just(cached);
@@ -55,17 +59,24 @@ public class DeepSeekEmbeddingService {
                 .bodyToMono(JsonNode.class)
                 .timeout(Duration.ofSeconds(5))
                 .map(node -> {
-                    List<Float> vector = new ArrayList<>();
-                    JsonNode embedding = node.get("data").get(0).get("embedding");
-                    embedding.forEach(v -> vector.add(v.floatValue()));
+                    List<Float> vector = extractVector(node);
                     cache.put(text, vector);
                     return vector;
                 })
-                .onErrorResume(e -> {
-                    log.warn("Embedding API call failed: {}", e.getMessage());
-                    return Mono.empty();
-                })
+                .doOnError(e -> log.warn("Embedding API call failed: {}", e.getMessage()))
+                .onErrorResume(e -> Mono.empty())
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private List<Float> extractVector(JsonNode node) {
+        JsonNode data = node.get("data");
+        if (data == null || !data.isArray() || data.isEmpty()) {
+            log.warn("Embedding API returned unexpected response: missing data array");
+            return List.of();
+        }
+        List<Float> vector = new ArrayList<>();
+        data.get(0).get("embedding").forEach(v -> vector.add(v.floatValue()));
+        return vector;
     }
 
     /** 清理缓存（知识条目更新时调用） */
