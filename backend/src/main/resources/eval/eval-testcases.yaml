@@ -1,0 +1,30 @@
+testcases:
+  - id: tc-001
+    query: "商品怎么退货？"
+    expectedChunkIds: []
+    expectedAnswer: ""
+    tenantId: "default"
+
+  - id: tc-002
+    query: "快递太慢了，都五天了"
+    expectedChunkIds: []
+    expectedAnswer: ""
+    tenantId: "default"
+
+  - id: tc-003
+    query: "怎么使用优惠券"
+    expectedChunkIds: []
+    expectedAnswer: ""
+    tenantId: "default"
+
+  - id: tc-004
+    query: "怎么联系人工客服"
+    expectedChunkIds: []
+    expectedAnswer: ""
+    tenantId: "default"
+
+  - id: tc-005
+    query: "我的订单怎么还没到"
+    expectedChunkIds: []
+    expectedAnswer: ""
+    tenantId: "default"
