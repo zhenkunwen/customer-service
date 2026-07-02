@@ -23,6 +23,7 @@
         <resilience4j.version>2.2.0</resilience4j.version>
         <lombok.version>1.18.32</lombok.version>
         <flyway.version>9.22.3</flyway.version>
+        <elasticsearch.version>8.12.0</elasticsearch.version>
     </properties>
 
     <dependencies>
@@ -151,7 +152,7 @@
         <dependency>
             <groupId>co.elastic.clients</groupId>
             <artifactId>elasticsearch-java</artifactId>
-            <version>8.12.0</version>
+            <version>${elasticsearch.version}</version>
         </dependency>
     </dependencies>
 
