@@ -8,6 +8,10 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 
+# Agent Frontend
+agent-frontend/node_modules/
+agent-frontend/dist/
+
 # Environment files
 .env
 !.env.example
@@ -33,10 +37,12 @@ mysql-data/
 # H2 file database (local dev)
 backend/data/
 
-# External mall projects
+# External projects & untracked utilities
 mall/
 mall-admin-web/
 mall-app-web/
+MediCareAI/
+agent-frontend/
 
 # Build artifacts
 *.tsbuildinfo
