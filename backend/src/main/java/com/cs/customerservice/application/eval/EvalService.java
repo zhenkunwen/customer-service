@@ -84,22 +84,28 @@ public class EvalService {
 
     /** 执行完整评测 */
     public Mono<EvalReport> runEvaluation(String tenantId) {
-        List<EvalTestCase> allCases = loadTestCases();
-        List<EvalTestCase> filtered = tenantId != null && !tenantId.isBlank()
-                ? allCases.stream().filter(c -> tenantId.equals(c.getTenantId())).collect(Collectors.toList())
-                : allCases;
+        return Mono.fromCallable(() -> loadTestCases())
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(allCases -> {
+                    List<EvalTestCase> filtered = tenantId != null && !tenantId.isBlank()
+                            ? allCases.stream().filter(c -> tenantId.equals(c.getTenantId())).collect(Collectors.toList())
+                            : allCases;
 
-        if (filtered.isEmpty()) {
-            return Mono.just(new EvalReport(tenantId, Instant.now(),
-                    new EvalReport.Summary(), List.of()));
-        }
+                    if (filtered.isEmpty()) {
+                        return Mono.just(new EvalReport(tenantId, Instant.now(),
+                                new EvalReport.Summary(), List.of()));
+                    }
 
-        return Flux.fromIterable(filtered)
-                .flatMap(tc -> evaluateSingle(tc).subscribeOn(Schedulers.boundedElastic()))
-                .collectList()
-                .map(details -> {
-                    EvalReport.Summary summary = aggregate(details);
-                    return new EvalReport(tenantId, Instant.now(), summary, details);
+                    return Flux.fromIterable(filtered)
+                            .flatMap(tc -> evaluateSingle(tc).subscribeOn(Schedulers.boundedElastic()))
+                            .collectList()
+                            .map(details -> {
+                                EvalReport.Summary summary = aggregate(details);
+                                log.info("Evaluation complete: {} cases, avgRecall={}, avgPrecision={}, avgCorrectness={}",
+                                        details.size(), summary.getAvgRecall(), summary.getAvgPrecision(),
+                                        summary.getAvgCorrectness());
+                                return new EvalReport(tenantId, Instant.now(), summary, details);
+                            });
                 });
     }
 
