@@ -247,23 +247,23 @@ public class EvalService {
 
     // ========== 指标计算 ==========
 
-    static double computeRecall(List<String> retrieved, List<String> expected) {
+    public static double computeRecall(List<String> retrieved, List<String> expected) {
         if (expected.isEmpty()) return 0;
         long hitCount = retrieved.stream().filter(expected::contains).count();
         return (double) hitCount / expected.size();
     }
 
-    static double computePrecision(List<String> retrieved, List<String> expected) {
+    public static double computePrecision(List<String> retrieved, List<String> expected) {
         if (retrieved.isEmpty()) return 0;
         long hitCount = retrieved.stream().filter(expected::contains).count();
         return (double) hitCount / retrieved.size();
     }
 
-    static boolean computeHit(List<String> retrieved, List<String> expected) {
+    public static boolean computeHit(List<String> retrieved, List<String> expected) {
         return retrieved.stream().anyMatch(expected::contains);
     }
 
-    static double computeMrr(List<String> retrieved, List<String> expected) {
+    public static double computeMrr(List<String> retrieved, List<String> expected) {
         for (int i = 0; i < retrieved.size(); i++) {
             if (expected.contains(retrieved.get(i))) {
                 return 1.0 / (i + 1);
