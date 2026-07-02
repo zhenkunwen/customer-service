@@ -1,3 +1,14 @@
+# RAG 评测测试用例
+#
+# 使用方法：
+# 1. 先将知识库文档上传到 ES（POST /api/v1/knowledge/batch）
+# 2. 查看已上传文档的 ID（GET /api/v1/knowledge?tenantId=default）
+# 3. 将对应 chunk ID 填入 expectedChunkIds
+# 4. 将期望回答填入 expectedAnswer（留空则只测召回率，不测回答质量）
+#
+# expectedChunkIds: 期望被召回的 ES 知识库文档 ID
+# expectedAnswer: 期望的理想回答（不为空时触发 Layer 2 回答质量评测）
+
 testcases:
   - id: tc-001
     query: "商品怎么退货？"

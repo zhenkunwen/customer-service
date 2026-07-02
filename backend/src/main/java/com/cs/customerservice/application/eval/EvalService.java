@@ -1,7 +1,6 @@
 package com.cs.customerservice.application.eval;
 
 import com.cs.customerservice.api.dto.ChatRequest;
-import com.cs.customerservice.api.dto.ChatResponse;
 import com.cs.customerservice.application.orchestrator.CustomerChatOrchestrator;
 import com.cs.customerservice.application.service.KnowledgeRetrievalPort;
 import com.cs.customerservice.domain.KnowledgeChunk;
@@ -17,6 +16,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.InputStream;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -77,7 +77,7 @@ public class EvalService {
             }
             return cases;
         } catch (Exception e) {
-            log.warn("Failed to load test cases: {}", e.getMessage());
+            log.error("Failed to load test cases", e);
             return List.of();
         }
     }
@@ -106,7 +106,8 @@ public class EvalService {
                                         summary.getAvgCorrectness());
                                 return new EvalReport(tenantId, Instant.now(), summary, details);
                             });
-                });
+                })
+                .timeout(Duration.ofSeconds(300));
     }
 
     /** 评测单条用例 */
