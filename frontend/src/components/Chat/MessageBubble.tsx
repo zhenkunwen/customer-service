@@ -9,14 +9,21 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
-function Avatar({ role }: { role: 'user' | 'assistant' }) {
+function Avatar({ role }: { role: 'user' | 'assistant' | 'agent' }) {
   if (role === 'assistant') {
     return (
       <img
         src="/assets/cs-avatar.png"
-        alt="客服"
+        alt="AI"
         className="w-8 h-8 rounded-full shrink-0 shadow-sm object-cover"
       />
+    );
+  }
+  if (role === 'agent') {
+    return (
+      <div className="w-8 h-8 rounded-full shrink-0 shadow-sm bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-sm">
+        👤
+      </div>
     );
   }
   return (
@@ -42,6 +49,7 @@ export default function MessageBubble({
   const isUser = m.role === 'user';
   const isTool = m.role === 'tool';
   const isAssistant = m.role === 'assistant';
+  const isAgent = m.role === 'agent';
   const [copied, setCopied] = useState(false);
   const [thumb, setThumb] = useState<'up' | 'down' | null>(null);
 
@@ -71,20 +79,27 @@ export default function MessageBubble({
     <div className={`flex flex-col px-4 group ${isUser ? 'items-end' : 'items-start'}`}>
       {/* 头像 + 消息行 */}
       <div className={`flex items-end gap-2 max-w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-        <Avatar role={isAssistant ? 'assistant' : 'user'} />
+        <Avatar role={isAssistant ? 'assistant' : isAgent ? 'agent' : 'user'} />
         <div
           className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
             isUser
               ? 'bg-primary-500 text-white rounded-br-md'
-              : isAssistant
-                ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md shadow-sm'
-                : 'bg-yellow-50 dark:bg-yellow-900/20 text-gray-600 dark:text-gray-400 border border-yellow-200 dark:border-yellow-800'
+              : isAgent
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-gray-800 dark:text-gray-200 border border-blue-200 dark:border-blue-800 rounded-bl-md shadow-sm'
+                : isAssistant
+                  ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md shadow-sm'
+                  : 'bg-yellow-50 dark:bg-yellow-900/20 text-gray-600 dark:text-gray-400 border border-yellow-200 dark:border-yellow-800'
           }`}
         >
           {isAssistant && m.model && (
             <div className="text-xs text-gray-400 dark:text-gray-500 mb-1 flex items-center gap-2">
               <span>{m.model}</span>
               {m.latencyMs != null && m.latencyMs > 0 && <span>· {m.latencyMs}ms</span>}
+            </div>
+          )}
+          {isAgent && (
+            <div className="text-xs text-blue-500 dark:text-blue-400 mb-1 flex items-center gap-2">
+              <span>👤 客服 · {m.model}</span>
             </div>
           )}
           <div className="break-words">

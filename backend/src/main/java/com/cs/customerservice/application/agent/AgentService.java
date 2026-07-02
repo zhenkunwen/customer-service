@@ -80,4 +80,18 @@ public class AgentService {
             return agent;
         }).subscribeOn(Schedulers.boundedElastic());
     }
+
+    public Mono<Void> deleteAgent(Long id, Long operatorId) {
+        return Mono.fromRunnable(() -> {
+            if (id.equals(operatorId)) {
+                throw new IllegalArgumentException("不能删除自己");
+            }
+            AgentEntity agent = agentRepository.findById(id).orElse(null);
+            if (agent == null) {
+                throw new IllegalArgumentException("客服账号不存在");
+            }
+            agentRepository.delete(agent);
+            log.info("Agent deleted: id={}, username={}", id, agent.getUsername());
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
 }

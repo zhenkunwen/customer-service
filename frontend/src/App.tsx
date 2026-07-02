@@ -1,29 +1,44 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useMessageStore } from '@/stores/messageStore';
+import { getSessionMessages } from '@/api/session';
 import ConfigSidebar from '@/components/Sidebar/ConfigSidebar';
 import MessageList from '@/components/Chat/MessageList';
 import ChatInput from '@/components/Chat/ChatInput';
-import MainNav from '@/components/Layout/MainNav';
-import AgentLogin from '@/pages/AgentLogin';
-import AgentDashboard from '@/pages/AgentDashboard';
 import { useUIStore } from '@/stores/uiStore';
-import { useAgentStore } from '@/stores/agentStore';
 
 export default function App() {
-  const [mode, setMode] = useState<'chat' | 'agent'>('chat');
-  const agentToken = useAgentStore((s) => s.token);
-  const clearAuth = useAgentStore((s) => s.clearAuth);
   const error = useUIStore((s) => s.error);
   const setError = useUIStore((s) => s.setError);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const agentFirstEntry = useRef(true);
+  const sessionId = useSessionStore((s) => s.sessionId);
+  const addAgentMessage = useMessageStore((s) => s.addAgentMessage);
+  const clearMessages = useMessageStore((s) => s.clearMessages);
+  const seenAgentIds = useRef<Set<number>>(new Set());
 
-  const handleModeChange = (newMode: 'chat' | 'agent') => {
-    if (newMode === 'agent' && agentFirstEntry.current) {
-      agentFirstEntry.current = false;
-      if (agentToken) clearAuth();
-    }
-    setMode(newMode);
-  };
+  // Poll agent messages every 10 seconds
+  useEffect(() => {
+    if (!sessionId) return;
+    // 切换 session 时清除旧消息和已见记录
+    seenAgentIds.current.clear();
+    clearMessages();
+    const poll = async () => {
+      try {
+        const records = await getSessionMessages(sessionId);
+        if (!Array.isArray(records)) return;
+        for (const r of records) {
+          if (r.model === '__agent__' && r.id && !seenAgentIds.current.has(r.id)) {
+            seenAgentIds.current.add(r.id);
+            const sender = (r.userId || '').replace('agent:', '') || '客服';
+            addAgentMessage(r.answer || '', sender);
+          }
+        }
+      } catch { /* ignore polling errors */ }
+    };
+    poll(); // initial fetch
+    const timer = setInterval(poll, 10000);
+    return () => clearInterval(timer);
+  }, [sessionId, addAgentMessage, clearMessages]);
 
   useEffect(() => {
     if (error) {
@@ -36,7 +51,6 @@ export default function App() {
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      // 不在输入框中时才触发
       if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !(e.ctrlKey || e.metaKey) && e.key === '/') {
         e.preventDefault();
         inputRef.current?.focus();
@@ -53,26 +67,19 @@ export default function App() {
 
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900">
-      <MainNav mode={mode} onModeChange={handleModeChange} />
-      {mode === 'chat' ? (
-        <div className="flex-1 flex flex-col lg:flex-row min-w-0">
-          <ConfigSidebar />
-          <main className="flex-1 flex flex-col min-h-0">
-            {error && (
-              <div className="mx-4 mt-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm flex items-center justify-between">
-                <span>❌ {error}</span>
-                <button onClick={() => setError(null)} className="ml-2 font-bold">×</button>
-              </div>
-            )}
-            <MessageList />
-            <ChatInput ref={inputRef} />
-          </main>
-        </div>
-      ) : agentToken ? (
-        <AgentDashboard />
-      ) : (
-        <AgentLogin />
-      )}
+      <div className="flex-1 flex flex-col lg:flex-row min-w-0">
+        <ConfigSidebar />
+        <main className="flex-1 flex flex-col min-h-0">
+          {error && (
+            <div className="mx-4 mt-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm flex items-center justify-between">
+              <span>❌ {error}</span>
+              <button onClick={() => setError(null)} className="ml-2 font-bold">×</button>
+            </div>
+          )}
+          <MessageList />
+          <ChatInput ref={inputRef} />
+        </main>
+      </div>
     </div>
   );
 }

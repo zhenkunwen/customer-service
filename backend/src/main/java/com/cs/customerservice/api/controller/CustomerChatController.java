@@ -1,8 +1,11 @@
 package com.cs.customerservice.api.controller;
 
+import com.cs.customerservice.api.dto.ChatRecordResponse;
 import com.cs.customerservice.api.dto.ChatRequest;
 import com.cs.customerservice.api.dto.ChatResponse;
 import com.cs.customerservice.application.orchestrator.CustomerChatOrchestrator;
+import com.cs.customerservice.infrastructure.entity.ChatRecord;
+import com.cs.customerservice.infrastructure.entity.ChatRecordRepository;
 import com.cs.customerservice.infrastructure.model.ModelRouter;
 import com.cs.customerservice.infrastructure.tracing.TraceIdWebFilter;
 import com.cs.customerservice.support.security.PromptGuardService;
@@ -17,6 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,8 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/cs")
@@ -37,13 +46,25 @@ public class CustomerChatController {
     private final CustomerChatOrchestrator orchestrator;
     private final ModelRouter modelRouter;
     private final PromptGuardService promptGuardService;
+    private final ChatRecordRepository chatRecordRepository;
 
     public CustomerChatController(CustomerChatOrchestrator orchestrator,
                                   ModelRouter modelRouter,
-                                  PromptGuardService promptGuardService) {
+                                  PromptGuardService promptGuardService,
+                                  ChatRecordRepository chatRecordRepository) {
         this.orchestrator = orchestrator;
         this.modelRouter = modelRouter;
         this.promptGuardService = promptGuardService;
+        this.chatRecordRepository = chatRecordRepository;
+    }
+
+    @GetMapping("/sessions/{sessionId}/messages")
+    @Operation(summary = "获取会话消息", description = "获取指定会话的所有消息（AI回复 + 客服消息），按时间升序排列。客户前端轮询此接口获取新消息。")
+    public Mono<List<ChatRecordResponse>> sessionMessages(@PathVariable String sessionId) {
+        return Mono.fromCallable(() ->
+                chatRecordRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
+                        .stream().map(this::toChatRecordDto).collect(Collectors.toList())
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping("/chat")
@@ -64,6 +85,7 @@ public class CustomerChatController {
         return Mono.just(request)
                 .flatMap(req -> orchestrator.chat(req, false, req.isToolMode()))
                 .timeout(Duration.ofSeconds(120))
+                .doOnNext(resp -> saveChatRecord(request, resp))
                 .onErrorResume(PromptGuardService.PromptGuardException.class,
                         e -> Mono.just(ChatResponse.builder()
                                 .sessionId(request.getSessionId())
@@ -125,6 +147,33 @@ public class CustomerChatController {
                 });
     }
 
+    private void saveChatRecord(ChatRequest request, ChatResponse response) {
+        try {
+            ChatRecord record = ChatRecord.builder()
+                    .sessionId(request.getSessionId())
+                    .tenantId(request.getTenantId())
+                    .userId(request.getUserId() != null ? request.getUserId() : "")
+                    .model(response.getModel() != null ? response.getModel() : "unknown")
+                    .question(request.getQuestion())
+                    .answer(response.getAnswer())
+                    .latencyMs(response.getLatencyMs())
+                    .status("ARCHIVED")
+                    .createdAt(Instant.now())
+                    .build();
+            chatRecordRepository.save(record);
+        } catch (Exception e) {
+            log.warn("Failed to save chat record (non-critical): {}", e.getMessage());
+        }
+    }
+
+    private ChatRecordResponse toChatRecordDto(ChatRecord r) {
+        return ChatRecordResponse.builder()
+                .id(r.getId()).userId(r.getUserId()).model(r.getModel())
+                .question(r.getQuestion()).answer(r.getAnswer())
+                .latencyMs(r.getLatencyMs()).status(r.getStatus())
+                .createdAt(r.getCreatedAt()).build();
+    }
+
     @PostMapping("/chat/tool")
     @Operation(summary = "工具对话", description = "启用函数调用的对话模式。AI 可根据用户问题自动调用订单查询、物流追踪、退货政策等工具。功能同普通对话 toolMode=true。")
     @ApiResponses({
@@ -143,6 +192,7 @@ public class CustomerChatController {
         return Mono.just(request)
                 .flatMap(req -> orchestrator.chat(req, false, true))
                 .timeout(Duration.ofSeconds(120))
+                .doOnNext(resp -> saveChatRecord(request, resp))
                 .onErrorResume(PromptGuardService.PromptGuardException.class,
                         e -> Mono.just(ChatResponse.builder()
                                 .sessionId(request.getSessionId())

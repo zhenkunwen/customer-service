@@ -46,8 +46,8 @@ public class AgentController {
             @RequestParam(defaultValue = "AGENT") String role,
             ServerWebExchange exchange) {
         AgentEntity currentAgent = exchange.getAttribute("agent");
-        if (currentAgent == null || !"ADMIN".equals(currentAgent.getRole())) {
-            throw new IllegalStateException("仅管理员可注册新客服账号");
+        if (currentAgent == null || !"TEAM_LEAD".equals(currentAgent.getRole())) {
+            throw new IllegalStateException("仅主管可注册新客服账号");
         }
         return agentService.register(username, password, role)
                 .map(agent -> Map.<String, Object>of(
@@ -57,11 +57,21 @@ public class AgentController {
                 ));
     }
 
+    @DeleteMapping("/{id}")
+    public Mono<Map<String, String>> delete(@PathVariable Long id, ServerWebExchange exchange) {
+        AgentEntity currentAgent = exchange.getAttribute("agent");
+        if (currentAgent == null || !"TEAM_LEAD".equals(currentAgent.getRole())) {
+            throw new IllegalStateException("仅主管可删除客服账号");
+        }
+        return agentService.deleteAgent(id, currentAgent.getId())
+                .thenReturn(Map.of("message", "客服账号已删除"));
+    }
+
     @GetMapping("/loads")
     public Mono<List<AgentLoadResponse>> listLoads(ServerWebExchange exchange) {
         AgentEntity agent = exchange.getAttribute("agent");
-        if (agent == null || (!"ADMIN".equals(agent.getRole()) && !"TEAM_LEAD".equals(agent.getRole()))) {
-            throw new IllegalStateException("仅管理员和团队主管可查看客服负载");
+        if (agent == null || !"TEAM_LEAD".equals(agent.getRole())) {
+            throw new IllegalStateException("仅主管可查看客服负载");
         }
         return agentService.listAgentLoads();
     }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SessionConfig, TenantId } from '@/api/types';
 import { v4 as uuidv4 } from 'uuid';
+import { useMessageStore } from './messageStore';
 
 function loadSessionId(): string {
   try {
@@ -66,6 +67,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   newSession: () => {
     const newId = uuidv4();
     persistSessionId(newId);
+    useMessageStore.getState().clearMessages();
     set({ sessionId: newId });
   },
 }));

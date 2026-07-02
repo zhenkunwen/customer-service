@@ -1,9 +1,10 @@
 -- 幂等写入: 文件模式 H2 重启时不会重复插入
 
--- 管理员账号
+-- 管理员账号（主管）
 INSERT INTO agents (username, password_hash, role, status)
-SELECT 'admin', '$2b$10$NmT3Jfn6/.PksK.FlpZEs.85BNL2p39kr9h6pZYnq1QkpM7lnbs.u', 'ADMIN', 'OFFLINE'
+SELECT 'admin', '$2b$10$NmT3Jfn6/.PksK.FlpZEs.85BNL2p39kr9h6pZYnq1QkpM7lnbs.u', 'TEAM_LEAD', 'OFFLINE'
 WHERE NOT EXISTS (SELECT 1 FROM agents WHERE username = 'admin');
+UPDATE agents SET role = 'TEAM_LEAD' WHERE username = 'admin' AND role = 'ADMIN';
 
 -- 订单
 INSERT INTO orders (order_id, user_id, status, amount, product_detail, create_time)

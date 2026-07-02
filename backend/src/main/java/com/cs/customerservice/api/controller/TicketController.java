@@ -93,13 +93,13 @@ public class TicketController {
                                          @Valid @RequestBody TicketUpdateRequest request,
                                          ServerWebExchange exchange) {
         AgentEntity agent = getAgent(exchange);
-        return ticketService.resolve(id, agent.getId(), request);
+        return ticketService.resolve(id, agent.getId(), request, "TEAM_LEAD".equals(agent.getRole()));
     }
 
     @PutMapping("/{id}/close")
     public Mono<TicketResponse> close(@PathVariable Long id, ServerWebExchange exchange) {
         AgentEntity agent = getAgent(exchange);
-        return ticketService.close(id, agent.getId(), "ADMIN".equals(agent.getRole()));
+        return ticketService.close(id, agent.getId(), "TEAM_LEAD".equals(agent.getRole()));
     }
 
     @GetMapping("/{id}/chat-history")
@@ -107,11 +107,24 @@ public class TicketController {
         return ticketService.getChatHistory(id);
     }
 
+    @PostMapping("/{id}/agent-message")
+    public Mono<Map<String, Object>> sendAgentMessage(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            ServerWebExchange exchange) {
+        AgentEntity agent = getAgent(exchange);
+        String message = body.get("message");
+        if (message == null || message.isBlank()) {
+            throw new IllegalArgumentException("消息不能为空");
+        }
+        return ticketService.addAgentMessage(id, agent, message);
+    }
+
     @DeleteMapping("/{id}")
     public Mono<Map<String, String>> delete(@PathVariable Long id, ServerWebExchange exchange) {
         AgentEntity agent = getAgent(exchange);
-        if (!"ADMIN".equals(agent.getRole())) {
-            throw new IllegalStateException("仅管理员可删除工单");
+        if (!"TEAM_LEAD".equals(agent.getRole())) {
+            throw new IllegalStateException("仅主管可删除工单");
         }
         return ticketService.delete(id).thenReturn(Map.of("message", "工单已删除"));
     }

@@ -47,7 +47,7 @@ export type StreamEvent = StreamTokenEvent | StreamDoneEvent | StreamErrorEvent;
 
 // ==================== 消息类型 ====================
 
-export type MessageRole = 'user' | 'assistant' | 'tool' | 'system';
+export type MessageRole = 'user' | 'assistant' | 'tool' | 'system' | 'agent';
 
 export interface Message {
   id: string;

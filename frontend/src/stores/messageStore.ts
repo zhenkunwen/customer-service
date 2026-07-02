@@ -7,6 +7,7 @@ interface MessageStore {
   lastQuestion: string;
   addUserMessage: (content: string) => Message;
   addAssistantMessage: (content: string, model?: string, latencyMs?: number, fallback?: boolean) => Message;
+  addAgentMessage: (content: string, sender: string) => Message;
   addToolMessage: (toolCalls: Message['toolCalls']) => void;
   appendStreamToken: (msgId: string, token: string) => void;
   clearMessages: () => void;
@@ -35,6 +36,18 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
       model,
       latencyMs,
       fallback,
+      timestamp: Date.now(),
+    };
+    set((s) => ({ messages: [...s.messages, msg] }));
+    return msg;
+  },
+
+  addAgentMessage: (content, sender) => {
+    const msg: Message = {
+      id: uuidv4(),
+      role: 'agent',
+      content,
+      model: sender,
       timestamp: Date.now(),
     };
     set((s) => ({ messages: [...s.messages, msg] }));

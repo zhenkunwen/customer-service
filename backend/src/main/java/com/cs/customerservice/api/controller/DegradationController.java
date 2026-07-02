@@ -22,24 +22,25 @@ public class DegradationController {
     @GetMapping("/degradation")
     public Mono<Map<String, Object>> status(ServerWebExchange exchange) {
         AgentEntity agent = exchange.getAttribute("agent");
-        if (agent == null || !"ADMIN".equals(agent.getRole())) {
-            throw new IllegalStateException("仅管理员可查看降级状态");
+        if (agent == null || !"TEAM_LEAD".equals(agent.getRole())) {
+            throw new IllegalStateException("仅主管可查看降级状态");
         }
         return Mono.just(Map.of(
-                "degradationEnabled", degradationConfig.isEnabled(),
+                "enabled", degradationConfig.isEnabled(),
                 "mode", degradationConfig.isEnabled() ? "DEGRADED" : "NORMAL"
         ));
     }
 
     @PostMapping("/degradation/toggle")
-    public Mono<Map<String, Object>> toggle(@RequestParam boolean enabled, ServerWebExchange exchange) {
+    public Mono<Map<String, Object>> toggle(ServerWebExchange exchange) {
         AgentEntity agent = exchange.getAttribute("agent");
-        if (agent == null || !"ADMIN".equals(agent.getRole())) {
-            throw new IllegalStateException("仅管理员可切换降级模式");
+        if (agent == null || !"TEAM_LEAD".equals(agent.getRole())) {
+            throw new IllegalStateException("仅主管可切换降级模式");
         }
+        boolean enabled = !degradationConfig.isEnabled();
         degradationConfig.setEnabled(enabled);
         return Mono.just(Map.of(
-                "degradationEnabled", enabled,
+                "enabled", enabled,
                 "mode", enabled ? "DEGRADED" : "NORMAL",
                 "message", enabled ? "系统已进入降级模式，所有 AI 请求将返回兜底响应" : "系统已恢复正常模式"
         ));
