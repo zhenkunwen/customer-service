@@ -2,6 +2,11 @@
 
 每次回复开头必须叫我 **大佬**。
 
+## 基本原则
+
+### ❓ 不确定就问
+在遇到不确定的情况和细节需要获取时，主动询问，正确优先。不许编造，不许想当然的做假设，不许复杂化，不该碰的代码不许顺手改。
+
 ## 编码铁律
 
 ### 🚫 非必要不修改核心代码
@@ -50,4 +55,25 @@
 
 - 后端: Java 17 + Spring Boot 3 WebFlux + JPA + MySQL/H2 + Kafka
 - 前端: React 18 + TypeScript + Vite 5 + Zustand 4 + Tailwind CSS 3 + Axios
+- 测试: Python 3 + pytest + requests（集成测试）
 - 构建: `cd backend && mvn compile` / `cd frontend && npm run dev`
+
+## 测试
+
+### Eval 集成测试 — pytest 脚本
+```python
+# tests/eval_test.py — Eval API 集成测试
+import os, requests
+BASE = os.getenv("EVAL_BASE_URL", "http://localhost:8080")
+HDR = {"X-API-Key": os.getenv("EVAL_API_KEY", "change-me")}
+
+def test_list():     r = requests.get(f"{BASE}/api/v1/eval/testcases", headers=HDR); assert r.status_code==200; print(f"[PASS] {len(r.json())} cases")
+def test_gen():      r = requests.post(f"{BASE}/api/v1/eval/generate-testcases?count=3", headers=HDR); assert r.status_code==200; print(f"[PASS] {r.text}")
+def test_run():      r = requests.post(f"{BASE}/api/v1/eval/run", headers=HDR); d=r.json()["summary"]; assert r.status_code==200; print(f"[PASS] {d['totalCases']} cases, recall={d['avgRecall']:.2f}")
+def test_history():  r = requests.get(f"{BASE}/api/v1/eval/history", headers=HDR); assert r.status_code==200; print(f"[PASS] {len(r.json()['content'])} reports")
+```
+```bash
+# 运行
+pip install pytest requests
+cd tests && pytest eval_test.py -v
+```

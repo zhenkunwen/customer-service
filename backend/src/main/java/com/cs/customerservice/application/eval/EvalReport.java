@@ -33,6 +33,10 @@ public class EvalReport {
         private double avgCorrectness;
         private double avgFaithfulness;
         private double avgRelevance;
+        /** 准确率达标率：correctness ≥ 4 的用例占比 */
+        private double accuracyRate;
+        /** 有效评测数（有 expectedChunkIds 的用例数） */
+        private int validEvalCount;
     }
 
     /** 单条用例详情 */

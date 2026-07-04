@@ -31,6 +31,14 @@ spring:
     listener:
       auto-startup: false
 
+# Embedding: 阿里百炼 text-embedding-v3
+cs:
+  knowledge:
+    embedding:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      api-key: ${DASHSCOPE_API_KEY:}
+    embedding-model: text-embedding-v3
+
 server:
   error:
     include-message: always

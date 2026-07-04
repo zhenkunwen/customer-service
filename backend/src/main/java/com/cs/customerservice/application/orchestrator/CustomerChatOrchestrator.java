@@ -278,7 +278,7 @@ public class CustomerChatOrchestrator {
         Mono<String> summaryMono = memoryService.loadSummary(request.getSessionId())
                 .subscribeOn(Schedulers.boundedElastic());
         Mono<List<KnowledgeChunk>> knowledgeMono = knowledgeRetrievalPort
-                .search(request.getTenantId(), sanitized, 3)
+                .search(request.getTenantId(), sanitized, 5)
                 .subscribeOn(Schedulers.boundedElastic());
         Mono<String> profileMono = userProfileService.getProfileSummary(request.getTenantId(), request.getUserId())
                 .subscribeOn(Schedulers.boundedElastic());
@@ -455,7 +455,7 @@ public class CustomerChatOrchestrator {
         Mono<String> summaryMono = memoryService.loadSummary(request.getSessionId())
                 .subscribeOn(Schedulers.boundedElastic());
         Mono<List<KnowledgeChunk>> knowledgeMono = knowledgeRetrievalPort
-                .search(request.getTenantId(), sanitized, 3)
+                .search(request.getTenantId(), sanitized, 5)
                 .subscribeOn(Schedulers.boundedElastic());
         Mono<String> profileMono = userProfileService.getProfileSummary(request.getTenantId(), request.getUserId())
                 .subscribeOn(Schedulers.boundedElastic());

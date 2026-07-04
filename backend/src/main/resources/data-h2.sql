@@ -49,3 +49,20 @@ WHERE NOT EXISTS (SELECT 1 FROM refund_policies WHERE product_type = 'DAILY');
 INSERT INTO refund_policies (product_type, refund_days, return_conditions, policy_detail)
 SELECT 'GENERAL', 7, 'Item intact with receipt', '7-day no-reason return. Custom items not eligible.'
 WHERE NOT EXISTS (SELECT 1 FROM refund_policies WHERE product_type = 'GENERAL');
+
+-- 示例对话记录（供评估数据集生成使用）
+INSERT INTO chat_records (session_id, tenant_id, user_id, model, question, answer, latency_ms, status, created_at)
+SELECT 'eval-session-001', 'default', 'u1', 'deepseek-chat', '商品怎么退货？', '您好，7天内可以无理由退货。电子产品需要保持原包装完整，衣物要保持吊牌未拆洗。请问您购买的是什么类型的商品？', 500, 'ARCHIVED', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM chat_records WHERE session_id = 'eval-session-001');
+INSERT INTO chat_records (session_id, tenant_id, user_id, model, question, answer, latency_ms, status, created_at)
+SELECT 'eval-session-002', 'default', 'u2', 'deepseek-chat', '快递太慢了，都五天了', '抱歉让您久等了。请提供您的订单号，我帮您查询物流状态。', 300, 'ARCHIVED', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM chat_records WHERE session_id = 'eval-session-002');
+INSERT INTO chat_records (session_id, tenant_id, user_id, model, question, answer, latency_ms, status, created_at)
+SELECT 'eval-session-003', 'default', 'u3', 'deepseek-chat', '怎么使用优惠券', '在结算页面可以选择优惠券。您可以在"我的优惠券"中查看可用的优惠券，选择后会自动抵扣金额。', 400, 'ARCHIVED', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM chat_records WHERE session_id = 'eval-session-003');
+INSERT INTO chat_records (session_id, tenant_id, user_id, model, question, answer, latency_ms, status, created_at)
+SELECT 'eval-session-004', 'default', 'u4', 'deepseek-chat', '怎么联系人工客服', '您可以直接在此对话中说明您的问题，我会先为您处理。如果问题较复杂，我们可以为您转接人工客服。', 350, 'ARCHIVED', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM chat_records WHERE session_id = 'eval-session-004');
+INSERT INTO chat_records (session_id, tenant_id, user_id, model, question, answer, latency_ms, status, created_at)
+SELECT 'eval-session-005', 'default', 'u5', 'deepseek-chat', '我的订单怎么还没到', '请提供您的订单号，我帮您查询物流状态。正常情况下，发货后3-5个工作日送达。', 450, 'ARCHIVED', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM chat_records WHERE session_id = 'eval-session-005');

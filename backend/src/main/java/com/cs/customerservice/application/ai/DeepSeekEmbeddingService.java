@@ -28,8 +28,8 @@ public class DeepSeekEmbeddingService {
     private final Map<String, List<Float>> cache;
 
     public DeepSeekEmbeddingService(
-            @Value("${spring.ai.openai.base-url:https://api.deepseek.com}") String baseUrl,
-            @Value("${spring.ai.openai.api-key:}") String apiKey,
+            @Value("${cs.knowledge.embedding.base-url:${spring.ai.openai.base-url:https://api.deepseek.com}}") String baseUrl,
+            @Value("${cs.knowledge.embedding.api-key:${spring.ai.openai.api-key:}}") String apiKey,
             @Value("${cs.knowledge.embedding-model:text-embedding-v2}") String model) {
         this.model = model;
         // 标准化 baseUrl，去除尾随斜杠
